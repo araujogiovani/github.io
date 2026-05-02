@@ -1,600 +1,786 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MedNotes</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-:root{
-  --bg:#f9f8f6;--sidebar-bg:#f2f0ec;--note-bg:#ffffff;--text:#1a1a1a;--text-muted:#888;
-  --border:#e0ddd8;--accent:#c8533a;--accent-light:#fdf0ee;--toolbar-bg:#fafaf8;
-  --tag-bg:#e8e4de;--tag-text:#555;--hover:#ede9e3;--sel:#e2ddd6;
-  --hl-yellow:#fff9c4;--hl-blue:#d6eaff;--hl-green:#d6f5e3;--hl-pink:#ffe0f0;
-  --font-editor:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-}
-[data-theme=dark]{
-  --bg:#1c1b19;--sidebar-bg:#232220;--note-bg:#2a2926;--text:#e8e5df;--text-muted:#777;
-  --border:#383632;--accent:#e07055;--accent-light:#3a2420;--toolbar-bg:#252422;
-  --tag-bg:#333128;--tag-text:#aaa;--hover:#2e2c28;--sel:#35332e;
-  --hl-yellow:#4a4200;--hl-blue:#0d2a4a;--hl-green:#0a3a1c;--hl-pink:#4a0d2a;
-}
-body{font-family:var(--font-editor);background:var(--bg);color:var(--text);height:100vh;display:flex;overflow:hidden;font-size:15px}
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MedNotes</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
 
-/* Sidebar */
-#sidebar{width:260px;min-width:200px;background:var(--sidebar-bg);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;transition:width .18s ease}
-#sidebar.collapsed{width:0;min-width:0;border:none}
-#sidebar-header{padding:14px 14px 10px;border-bottom:1px solid var(--border);flex-shrink:0}
-#app-title{font-size:16px;font-weight:700;letter-spacing:-.3px;color:var(--accent);margin-bottom:10px}
-#search-wrap{position:relative}
-#search{width:100%;padding:7px 10px 7px 30px;border:1px solid var(--border);border-radius:8px;background:var(--note-bg);color:var(--text);font-size:13px;outline:none;transition:border-color .15s}
-#search:focus{border-color:var(--accent)}
-#search-icon{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:14px;pointer-events:none}
-#tags-bar{padding:8px 14px;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:4px;min-height:36px;flex-shrink:0}
-.tag-filter{padding:2px 8px;border-radius:12px;background:var(--tag-bg);color:var(--tag-text);font-size:11px;cursor:pointer;border:1px solid transparent;user-select:none;transition:all .1s}
-.tag-filter.active{background:var(--accent);color:#fff}
-#notes-list{flex:1;overflow-y:auto;padding:6px 0}
-.note-item{padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);transition:background .1s}
-.note-item:hover{background:var(--hover)}
-.note-item.active{background:var(--sel)}
-.ni-title{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ni-preview{font-size:11px;color:var(--text-muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ni-tags{display:flex;flex-wrap:wrap;gap:3px;margin-top:4px}
-.ni-tag{font-size:10px;padding:1px 6px;border-radius:8px;background:var(--tag-bg);color:var(--tag-text)}
-.ni-date{font-size:10px;color:var(--text-muted);margin-top:3px}
+  <style>
+    /* ── Reset & Tokens ───────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* Main */
-#main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+    :root {
+      --bg:           #f9f8f6;
+      --sidebar-bg:   #f2f0ec;
+      --note-bg:      #ffffff;
+      --text:         #1a1a1a;
+      --text-muted:   #999;
+      --border:       #e0ddd8;
+      --accent:       #c8533a;
+      --accent-light: #fdf0ee;
+      --toolbar-bg:   #fafaf8;
+      --tag-bg:       #eae6e0;
+      --tag-text:     #666;
+      --hover:        #ede9e3;
+      --sel:          #e2ddd6;
+      --font:         -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --font-mono:    'SF Mono', Monaco, Consolas, monospace;
+      /* highlight colours */
+      --hl-y: #fff9c4; --hl-b: #d6eaff; --hl-g: #d6f5e3; --hl-p: #ffe0f0;
+    }
 
-/* Toolbar */
-#toolbar{padding:7px 12px;border-bottom:1px solid var(--border);background:var(--toolbar-bg);display:flex;align-items:center;gap:5px;flex-wrap:wrap;flex-shrink:0}
-.tb-btn{padding:4px 8px;border:1px solid var(--border);border-radius:5px;background:var(--note-bg);color:var(--text);cursor:pointer;font-size:12px;display:flex;align-items:center;gap:3px;white-space:nowrap;transition:background .1s;line-height:1.3}
-.tb-btn:hover{background:var(--hover)}
-.tb-btn.on{background:var(--accent);color:#fff;border-color:var(--accent)}
-.tb-sep{width:1px;height:18px;background:var(--border);margin:0 1px;flex-shrink:0}
-.tb-select{padding:4px 6px;border:1px solid var(--border);border-radius:5px;background:var(--note-bg);color:var(--text);font-size:12px;cursor:pointer;outline:none}
-input[type=color].tb-color{width:26px;height:26px;border:1px solid var(--border);border-radius:5px;padding:1px;cursor:pointer;background:var(--note-bg)}
-#toggle-sidebar{font-size:15px;cursor:pointer;background:none;border:none;color:var(--text-muted);padding:4px 6px;border-radius:5px;line-height:1}
-#toggle-sidebar:hover{color:var(--text);background:var(--hover)}
-#new-note-btn{margin-left:auto;padding:5px 12px;background:var(--accent);color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap}
-#new-note-btn:hover{opacity:.85}
-#del-note-btn{padding:4px 8px;border:1px solid var(--border);border-radius:5px;background:none;color:var(--text-muted);cursor:pointer;font-size:12px}
-#del-note-btn:hover{background:#fee;color:#c00;border-color:#fcc}
+    [data-theme="dark"] {
+      --bg:           #1c1b19;
+      --sidebar-bg:   #232220;
+      --note-bg:      #2a2926;
+      --text:         #e8e5df;
+      --text-muted:   #777;
+      --border:       #383632;
+      --accent:       #e07055;
+      --accent-light: #3a2420;
+      --toolbar-bg:   #252422;
+      --tag-bg:       #333128;
+      --tag-text:     #aaa;
+      --hover:        #2e2c28;
+      --sel:          #35332e;
+      --hl-y: #4a4200; --hl-b: #0d2a4a; --hl-g: #0a3a1c; --hl-p: #4a0d2a;
+    }
 
-/* Editor area */
-#editor-area{flex:1;overflow:hidden;display:flex;flex-direction:column}
-#empty-state{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:var(--text-muted)}
-#editor-wrap{display:none;flex:1;flex-direction:column;overflow:hidden;background:var(--note-bg)}
-#note-title-input{width:100%;padding:18px 32px 10px;font-size:24px;font-weight:700;border:none;outline:none;background:transparent;color:var(--text);border-bottom:1px solid var(--border);flex-shrink:0;font-family:var(--font-editor)}
-#tags-input-wrap{padding:6px 32px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px;flex-wrap:wrap;flex-shrink:0;min-height:34px}
-#tags-input-wrap .tag-label{font-size:12px;color:var(--text-muted)}
-.edit-tag{font-size:11px;padding:2px 8px;border-radius:10px;background:var(--accent-light);color:var(--accent);display:flex;align-items:center;gap:3px;cursor:default}
-.rm-tag{cursor:pointer;font-size:14px;line-height:1;color:var(--accent);opacity:.7}
-.rm-tag:hover{opacity:1}
-#new-tag-input{border:none;outline:none;background:transparent;color:var(--text);font-size:12px;min-width:80px}
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      overflow: hidden;
+      font-size: 15px;
+    }
 
-/* Live editor — the heart of the app */
-#live-editor-wrap{flex:1;overflow-y:auto;position:relative;padding:20px 32px 60px;max-width:860px;width:100%;margin:0 auto}
+    /* ── Scrollbar ────────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
-/* The contenteditable block */
-#live-editor{outline:none;min-height:100%;font-size:16px;line-height:1.75;color:var(--text);caret-color:var(--accent);white-space:pre-wrap;word-break:break-word;font-family:var(--font-editor)}
+    /* ── Sidebar ──────────────────────────────────────────────────── */
+    #sidebar {
+      width: 260px;
+      min-width: 200px;
+      background: var(--sidebar-bg);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transition: width .18s ease;
+      flex-shrink: 0;
+    }
+    #sidebar.collapsed { width: 0; min-width: 0; border: none; }
 
-/* Rendered markdown inside live editor */
-#live-editor h1{font-size:1.75em;font-weight:700;margin:1.1em 0 .35em;border-bottom:2px solid var(--border);padding-bottom:.25em;line-height:1.2}
-#live-editor h2{font-size:1.35em;font-weight:700;margin:1em 0 .3em;line-height:1.3}
-#live-editor h3{font-size:1.1em;font-weight:700;margin:.9em 0 .25em;color:var(--accent)}
-#live-editor h4{font-size:1em;font-weight:700;margin:.8em 0 .2em;color:var(--text-muted)}
-#live-editor p{margin:.4em 0}
-#live-editor ul,#live-editor ol{padding-left:1.6em;margin:.4em 0}
-#live-editor li{margin:.2em 0}
-#live-editor strong{font-weight:700}
-#live-editor em{font-style:italic}
-#live-editor del{text-decoration:line-through;color:var(--text-muted)}
-#live-editor code{background:var(--tag-bg);border-radius:4px;padding:1px 5px;font-size:.87em;font-family:Monaco,Consolas,monospace;color:var(--accent)}
-#live-editor pre{background:var(--tag-bg);border-radius:8px;padding:14px 16px;overflow-x:auto;margin:.7em 0}
-#live-editor pre code{background:none;padding:0;color:var(--text);font-size:.87em}
-#live-editor blockquote{border-left:3px solid var(--accent);padding:.4em 1em;color:var(--text-muted);margin:.7em 0;background:var(--accent-light);border-radius:0 7px 7px 0}
-#live-editor hr{border:none;border-top:2px solid var(--border);margin:1.2em 0}
-#live-editor table{border-collapse:collapse;width:100%;margin:.7em 0;font-size:14px}
-#live-editor th,#live-editor td{border:1px solid var(--border);padding:7px 12px}
-#live-editor th{background:var(--tag-bg);font-weight:700;text-align:left}
-#live-editor img{max-width:100%;border-radius:8px;margin:10px 0;display:block}
-#live-editor a{color:var(--accent);text-decoration:underline}
-/* Highlights */
-#live-editor .hl-y{background:var(--hl-yellow);border-radius:2px;padding:0 2px}
-#live-editor .hl-b{background:var(--hl-blue);border-radius:2px;padding:0 2px}
-#live-editor .hl-g{background:var(--hl-green);border-radius:2px;padding:0 2px}
-#live-editor .hl-p{background:var(--hl-pink);border-radius:2px;padding:0 2px}
+    #sidebar-header { padding: 14px 14px 10px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+    #app-title { font-size: 16px; font-weight: 700; color: var(--accent); margin-bottom: 10px; letter-spacing: -.3px; }
 
-/* Raw markdown line (when cursor is on it) */
-.md-raw{font-family:Monaco,Consolas,monospace;font-size:14px;background:var(--tag-bg);border-radius:4px;padding:2px 6px;color:var(--text);display:block;white-space:pre-wrap}
+    #search-wrap { position: relative; }
+    #search-icon { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 14px; pointer-events: none; }
+    #search { width: 100%; padding: 7px 10px 7px 30px; border: 1px solid var(--border); border-radius: 8px; background: var(--note-bg); color: var(--text); font-size: 13px; outline: none; transition: border-color .15s; }
+    #search:focus { border-color: var(--accent); }
 
-/* Image panel */
-#img-panel{display:none;padding:10px 32px;border-top:1px solid var(--border);background:var(--toolbar-bg);align-items:center;gap:10px;flex-shrink:0}
-#img-panel.show{display:flex}
-#img-file{display:none}
-#img-panel label{padding:5px 12px;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:12px;background:var(--note-bg)}
-#img-panel label:hover{background:var(--hover)}
+    #tags-bar { padding: 8px 14px; border-bottom: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: 4px; min-height: 38px; flex-shrink: 0; align-items: center; }
+    .tag-pill { padding: 2px 8px; border-radius: 12px; background: var(--tag-bg); color: var(--tag-text); font-size: 11px; cursor: pointer; user-select: none; transition: all .12s; }
+    .tag-pill.active { background: var(--accent); color: #fff; }
 
-/* Scrollbar */
-::-webkit-scrollbar{width:5px}
-::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
-mark.sh{background:#ffeb3b;border-radius:2px;padding:0 1px}
-</style>
+    #notes-list { flex: 1; overflow-y: auto; }
+    .note-item { padding: 10px 14px; cursor: pointer; border-bottom: 1px solid var(--border); transition: background .1s; }
+    .note-item:hover { background: var(--hover); }
+    .note-item.active { background: var(--sel); }
+    .ni-title { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ni-preview { font-size: 11px; color: var(--text-muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ni-tags { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 4px; }
+    .ni-tag { font-size: 10px; padding: 1px 6px; border-radius: 8px; background: var(--tag-bg); color: var(--tag-text); }
+    .ni-date { font-size: 10px; color: var(--text-muted); margin-top: 3px; }
+
+    /* ── Main area ────────────────────────────────────────────────── */
+    #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+
+    /* ── Toolbar ──────────────────────────────────────────────────── */
+    #toolbar {
+      padding: 7px 12px;
+      border-bottom: 1px solid var(--border);
+      background: var(--toolbar-bg);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-wrap: wrap;
+      flex-shrink: 0;
+    }
+    .tb-btn {
+      padding: 4px 8px;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      background: var(--note-bg);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 12px;
+      line-height: 1.4;
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      white-space: nowrap;
+      transition: background .1s;
+      font-family: var(--font);
+    }
+    .tb-btn:hover { background: var(--hover); }
+    .tb-sep { width: 1px; height: 18px; background: var(--border); margin: 0 2px; flex-shrink: 0; }
+    .tb-select { padding: 4px 6px; border: 1px solid var(--border); border-radius: 5px; background: var(--note-bg); color: var(--text); font-size: 12px; outline: none; cursor: pointer; font-family: var(--font); }
+    input[type="color"].tb-color { width: 26px; height: 26px; border: 1px solid var(--border); border-radius: 5px; padding: 2px; cursor: pointer; background: var(--note-bg); }
+
+    #btn-toggle-sb { font-size: 15px; cursor: pointer; background: none; border: none; color: var(--text-muted); padding: 4px 6px; border-radius: 5px; }
+    #btn-toggle-sb:hover { color: var(--text); background: var(--hover); }
+    #btn-new { margin-left: auto; padding: 5px 13px; background: var(--accent); color: #fff; border: none; border-radius: 7px; cursor: pointer; font-size: 13px; font-weight: 600; white-space: nowrap; font-family: var(--font); }
+    #btn-new:hover { opacity: .85; }
+    #btn-del { padding: 4px 8px; border: 1px solid var(--border); border-radius: 5px; background: none; color: var(--text-muted); cursor: pointer; font-size: 12px; font-family: var(--font); }
+    #btn-del:hover { background: #fee2e2; color: #c00; border-color: #fca5a5; }
+
+    /* ── Editor area ──────────────────────────────────────────────── */
+    #editor-area { flex: 1; overflow: hidden; display: flex; flex-direction: column; background: var(--note-bg); }
+
+    #empty-state {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 10px; color: var(--text-muted);
+      background: var(--note-bg);
+    }
+
+    #note-wrap { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+
+    #note-title {
+      width: 100%; padding: 18px 40px 10px;
+      font-size: 24px; font-weight: 700;
+      border: none; outline: none;
+      background: transparent; color: var(--text);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0; font-family: var(--font);
+    }
+
+    #tags-row {
+      padding: 6px 40px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+      flex-shrink: 0; min-height: 34px;
+    }
+    .tags-label { font-size: 12px; color: var(--text-muted); }
+    .etag { font-size: 11px; padding: 2px 8px; border-radius: 10px; background: var(--accent-light); color: var(--accent); display: flex; align-items: center; gap: 3px; }
+    .etag-rm { cursor: pointer; font-size: 14px; line-height: 1; opacity: .7; }
+    .etag-rm:hover { opacity: 1; }
+    #tag-input { border: none; outline: none; background: transparent; color: var(--text); font-size: 12px; min-width: 80px; font-family: var(--font); }
+
+    /* ── Bear-style editor: textarea + highlight overlay ─────────── */
+    #editor-scroll {
+      flex: 1;
+      overflow-y: auto;
+      position: relative;
+    }
+
+    /*
+     * The trick: textarea and highlight div share identical
+     * font, size, padding, line-height so they overlap perfectly.
+     * The textarea is transparent (only caret visible);
+     * the highlight div renders coloured markdown on top.
+     */
+    #editor-highlight,
+    #editor-ta {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%;
+      min-height: 100%;
+      padding: 24px 40px 80px;
+      font-family: var(--font);
+      font-size: 16px;
+      line-height: 1.8;
+      tab-size: 2;
+      white-space: pre-wrap;
+      word-break: break-word;
+      overflow-wrap: break-word;
+    }
+
+    #editor-ta {
+      background: transparent;
+      color: transparent;
+      caret-color: var(--accent);
+      border: none;
+      outline: none;
+      resize: none;
+      z-index: 2;
+      height: 100%;
+      min-height: 400px;
+      overflow: hidden; /* scroll lives on parent */
+    }
+
+    #editor-highlight {
+      z-index: 1;
+      pointer-events: none;
+      color: var(--text);
+    }
+
+    /* ── Highlight syntax styles ──────────────────────────────────── */
+    .md-h1    { font-size: 1.7em;  font-weight: 700; color: var(--text); }
+    .md-h2    { font-size: 1.35em; font-weight: 700; color: var(--text); }
+    .md-h3    { font-size: 1.15em; font-weight: 700; color: var(--accent); }
+    .md-bold  { font-weight: 700; }
+    .md-italic{ font-style: italic; }
+    .md-strike{ text-decoration: line-through; color: var(--text-muted); }
+    .md-code  { font-family: var(--font-mono); font-size: .88em; background: var(--tag-bg); border-radius: 3px; padding: 0 4px; color: var(--accent); }
+    .md-link  { color: var(--accent); text-decoration: underline; }
+    .md-img   { color: var(--accent); font-style: italic; }
+    .md-quote { color: var(--text-muted); border-left: 3px solid var(--accent); padding-left: 10px; display: block; background: var(--accent-light); }
+    .md-hr    { color: var(--text-muted); }
+    .md-ul    { color: var(--accent); font-weight: 700; } /* bullet marker */
+    .md-ol    { color: var(--accent); font-weight: 700; }
+    .md-sym   { color: var(--text-muted); font-size: .85em; } /* markdown symbols dimmed */
+    .md-hl-y  { background: var(--hl-y); border-radius: 2px; }
+    .md-hl-b  { background: var(--hl-b); border-radius: 2px; }
+    .md-hl-g  { background: var(--hl-g); border-radius: 2px; }
+    .md-hl-p  { background: var(--hl-p); border-radius: 2px; }
+    .md-tag   { color: var(--accent); font-weight: 600; }
+
+    /* ── Image drop panel ─────────────────────────────────────────── */
+    #img-panel {
+      display: none;
+      padding: 9px 40px;
+      border-top: 1px solid var(--border);
+      background: var(--toolbar-bg);
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    #img-panel.open { display: flex; }
+    #img-file { display: none; }
+    #img-label {
+      padding: 5px 12px; border: 1px solid var(--border); border-radius: 6px;
+      cursor: pointer; font-size: 12px; background: var(--note-bg);
+      font-family: var(--font);
+    }
+    #img-label:hover { background: var(--hover); }
+
+    /* Search highlight */
+    mark.sh { background: #ffeb3b; border-radius: 2px; padding: 0 1px; }
+  </style>
 </head>
 <body data-theme="light">
 
-<div id="sidebar">
-  <div id="sidebar-header">
-    <div id="app-title">MedNotes</div>
-    <div id="search-wrap">
-      <span id="search-icon">⌕</span>
-      <input id="search" type="text" placeholder="Pesquisar...">
-    </div>
-  </div>
-  <div id="tags-bar"></div>
-  <div id="notes-list"></div>
-</div>
-
-<div id="main">
-  <div id="toolbar">
-    <button id="toggle-sidebar" title="Sidebar">☰</button>
-    <button id="new-note-btn">+ Nova nota</button>
-    <div class="tb-sep"></div>
-    <button class="tb-btn" data-cmd="bold" title="Negrito Ctrl+B"><b>B</b></button>
-    <button class="tb-btn" data-cmd="italic" title="Itálico Ctrl+I"><i>I</i></button>
-    <button class="tb-btn" data-cmd="strike" title="Tachado">S̶</button>
-    <button class="tb-btn" data-cmd="code" title="Código">&lt;/&gt;</button>
-    <div class="tb-sep"></div>
-    <input type="color" class="tb-color" id="color-picker" value="#c8533a" title="Cor">
-    <button class="tb-btn" id="apply-color" title="Aplicar cor ao texto selecionado"><span style="border-bottom:2px solid #c8533a;padding-bottom:1px">A</span></button>
-    <select class="tb-select" id="hl-select" title="Destacar">
-      <option value="">Destacar</option>
-      <option value="y">🟡 Amarelo</option>
-      <option value="b">🔵 Azul</option>
-      <option value="g">🟢 Verde</option>
-      <option value="p">🩷 Rosa</option>
-    </select>
-    <div class="tb-sep"></div>
-    <select class="tb-select" id="heading-sel">
-      <option value="">Título</option>
-      <option value="# ">H1</option>
-      <option value="## ">H2</option>
-      <option value="### ">H3</option>
-    </select>
-    <button class="tb-btn" data-cmd="ul">• Lista</button>
-    <button class="tb-btn" data-cmd="ol">1. Lista</button>
-    <button class="tb-btn" data-cmd="quote">❝</button>
-    <button class="tb-btn" data-cmd="hr">—</button>
-    <button class="tb-btn" data-cmd="table">⊞</button>
-    <div class="tb-sep"></div>
-    <button class="tb-btn" id="img-btn">🖼</button>
-    <div class="tb-sep"></div>
-    <button class="tb-btn" id="theme-btn" title="Tema claro/escuro">◑</button>
-    <button id="del-note-btn" title="Excluir nota">🗑</button>
-  </div>
-
-  <div id="editor-area">
-    <div id="empty-state">
-      <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".3"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-      <p style="font-size:14px">Selecione ou crie uma nota</p>
-    </div>
-    <div id="editor-wrap">
-      <input id="note-title-input" type="text" placeholder="Título da nota...">
-      <div id="tags-input-wrap">
-        <span class="tag-label">#</span>
-        <div id="current-tags"></div>
-        <input id="new-tag-input" type="text" placeholder="adicionar tag...">
-      </div>
-      <div id="live-editor-wrap">
-        <div id="live-editor" contenteditable="true" spellcheck="false"></div>
-      </div>
-      <div id="img-panel">
-        <span style="font-size:12px;color:var(--text-muted)">Inserir imagem:</span>
-        <label for="img-file">📁 Escolher</label>
-        <input type="file" id="img-file" accept="image/*" multiple>
-        <span style="font-size:11px;color:var(--text-muted)">ou cole Ctrl+V</span>
-        <button class="tb-btn" id="img-close" style="margin-left:auto">✕</button>
+  <!-- ══ SIDEBAR ══════════════════════════════════════════════════ -->
+  <div id="sidebar">
+    <div id="sidebar-header">
+      <div id="app-title">MedNotes</div>
+      <div id="search-wrap">
+        <span id="search-icon">⌕</span>
+        <input id="search" type="text" placeholder="Pesquisar notas, tags…" />
       </div>
     </div>
+    <div id="tags-bar"></div>
+    <div id="notes-list"></div>
   </div>
-</div>
 
-<script>
-// ======== STATE ========
-let notes = JSON.parse(localStorage.getItem('mednotes_v2') || '[]');
-let activeId = null;
-let filterTags = [];
-let searchQ = '';
-let saveTimer = null;
-let isRendering = false;
+  <!-- ══ MAIN ═════════════════════════════════════════════════════ -->
+  <div id="main">
 
-if(!notes.length){
-  notes = [{
-    id: Date.now(), title: 'Bem-vindo ao MedNotes',
-    content: `## Cardiologia Nuclear\n\nO editor converte **Markdown** em tempo real enquanto você escreve.\n\n### Atalhos\n- \`Ctrl+B\` → **negrito**\n- \`Ctrl+I\` → *itálico*\n- \`Ctrl+S\` → salvar\n\n### Destaques\nUse a barra de ferramentas para destacar texto em ==y:amarelo==, ==b:azul==, ==g:verde== ou ==p:rosa==.\n\n> Use tags para organizar por área: cardiologia, ecg, farmaco...\n\n---\n\n| Exame | Indicação | Sensibilidade |\n|-------|-----------|---------------|\n| Cintilografia | DAC | 87% |\n| PET-CT | Viabilidade | 95% |`,
-    tags:['tutorial','cardiologia'], created:Date.now(), updated:Date.now()
-  }];
-  saveNotes();
-}
+    <!-- Toolbar -->
+    <div id="toolbar">
+      <button id="btn-toggle-sb" title="Sidebar">☰</button>
+      <button id="btn-new">+ Nova nota</button>
+      <div class="tb-sep"></div>
+      <button class="tb-btn" data-cmd="bold"   title="Negrito Ctrl+B"><b>B</b></button>
+      <button class="tb-btn" data-cmd="italic" title="Itálico Ctrl+I"><i>I</i></button>
+      <button class="tb-btn" data-cmd="strike" title="Tachado">S̶</button>
+      <button class="tb-btn" data-cmd="code"   title="Código">&lt;/&gt;</button>
+      <div class="tb-sep"></div>
+      <input  type="color" class="tb-color" id="color-picker" value="#c8533a" title="Cor do texto" />
+      <button class="tb-btn" id="btn-color" title="Aplicar cor"><span style="border-bottom:2px solid #c8533a;padding-bottom:1px">A</span></button>
+      <select class="tb-select" id="hl-select" title="Destacar texto">
+        <option value="">Destacar</option>
+        <option value="y">🟡 Amarelo</option>
+        <option value="b">🔵 Azul</option>
+        <option value="g">🟢 Verde</option>
+        <option value="p">🩷 Rosa</option>
+      </select>
+      <div class="tb-sep"></div>
+      <select class="tb-select" id="heading-sel">
+        <option value="">Título…</option>
+        <option value="# ">H1</option>
+        <option value="## ">H2</option>
+        <option value="### ">H3</option>
+      </select>
+      <button class="tb-btn" data-cmd="ul"    >• Lista</button>
+      <button class="tb-btn" data-cmd="ol"    >1. Lista</button>
+      <button class="tb-btn" data-cmd="quote" >❝</button>
+      <button class="tb-btn" data-cmd="hr"    >—</button>
+      <button class="tb-btn" data-cmd="table" >⊞ Tabela</button>
+      <div class="tb-sep"></div>
+      <button class="tb-btn" id="btn-img">🖼 Imagem</button>
+      <div class="tb-sep"></div>
+      <button class="tb-btn" id="btn-theme" title="Tema">◑</button>
+      <button id="btn-del"   title="Excluir nota">🗑</button>
+    </div>
 
-function saveNotes(){localStorage.setItem('mednotes_v2', JSON.stringify(notes))}
-function getNote(id){return notes.find(n=>n.id===id)}
-function genId(){return Date.now()+Math.random()}
+    <!-- Editor area -->
+    <div id="editor-area">
 
-// ======== MARKDOWN ENGINE ========
-marked.setOptions({breaks:true, gfm:true});
+      <div id="empty-state">
+        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".3">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14,2 14,8 20,8"/>
+          <line x1="16" y1="13" x2="8" y2="13"/>
+          <line x1="16" y1="17" x2="8" y2="17"/>
+        </svg>
+        <p style="font-size:14px">Selecione ou crie uma nota</p>
+      </div>
 
-function mdToHtml(md){
-  let html = marked.parse(md);
-  html = html.replace(/==y:([\s\S]*?)==/g,'<span class="hl-y">$1</span>');
-  html = html.replace(/==b:([\s\S]*?)==/g,'<span class="hl-b">$1</span>');
-  html = html.replace(/==g:([\s\S]*?)==/g,'<span class="hl-g">$1</span>');
-  html = html.replace(/==p:([\s\S]*?)==/g,'<span class="hl-p">$1</span>');
-  return html;
-}
+      <div id="note-wrap">
+        <input id="note-title" type="text" placeholder="Título da nota…" />
 
-// ======== LIVE EDITOR ========
-// We store raw markdown in note.content, render HTML into contenteditable.
-// On input we extract text back to markdown and re-render, preserving cursor.
+        <div id="tags-row">
+          <span class="tags-label">#</span>
+          <div id="etags"></div>
+          <input id="tag-input" type="text" placeholder="adicionar tag…" />
+        </div>
 
-const liveEl = document.getElementById('live-editor');
+        <div id="editor-scroll">
+          <!-- Highlight layer (rendered markdown syntax) -->
+          <div id="editor-highlight" aria-hidden="true"></div>
+          <!-- Input layer (transparent textarea) -->
+          <textarea id="editor-ta" spellcheck="false" autocorrect="off" autocomplete="off"></textarea>
+        </div>
 
-function renderLive(md){
-  isRendering = true;
-  // Save selection
-  const sel = window.getSelection();
-  let anchorOffset = 0, anchorKey = null;
-  if(sel.rangeCount){
-    const r = sel.getRangeAt(0);
-    anchorOffset = r.startOffset;
-    if(r.startContainer) anchorKey = r.startContainer.textContent;
-  }
-  liveEl.innerHTML = mdToHtml(md);
-  // Restore cursor to end if we can't pin it
-  try{
-    const range = document.createRange();
-    range.selectNodeContents(liveEl);
-    range.collapse(false);
-    sel.removeAllRanges();
-    sel.addRange(range);
-  }catch(e){}
-  isRendering = false;
-}
+        <div id="img-panel">
+          <span style="font-size:12px;color:var(--text-muted)">Inserir imagem:</span>
+          <label id="img-label" for="img-file">📁 Escolher arquivo</label>
+          <input type="file" id="img-file" accept="image/*" multiple />
+          <span style="font-size:11px;color:var(--text-muted)">ou cole Ctrl+V no editor</span>
+          <button class="tb-btn" id="btn-img-close" style="margin-left:auto">✕ Fechar</button>
+        </div>
+      </div>
 
-// Extract markdown from rendered HTML (text nodes + structure)
-function extractMd(){
-  // We keep raw markdown in the note content, re-extract from text when needed
-  // Since we re-render on every keystroke, we track raw md separately
-  return currentRawMd;
-}
+    </div>
+  </div>
 
-let currentRawMd = '';
+  <script>
+  (() => {
+    /* ── Storage ─────────────────────────────────────────────────── */
+    const STORE = 'mednotes_v3';
+    let notes = JSON.parse(localStorage.getItem(STORE) || '[]');
+    let activeId = null, filterTags = [], searchQ = '';
+    let saveTimer = null;
 
-// Better approach: track raw md, re-render on changes
-// Use a hidden textarea mirror for raw content
-let composing = false;
-liveEl.addEventListener('compositionstart',()=>composing=true);
-liveEl.addEventListener('compositionend',()=>{composing=false;handleInput();});
+    function persist() { localStorage.setItem(STORE, JSON.stringify(notes)); }
+    function getNote(id) { return notes.find(n => n.id === id); }
+    function genId()  { return Date.now() + Math.random(); }
 
-liveEl.addEventListener('input', ()=>{
-  if(composing) return;
-  handleInput();
-});
+    if (!notes.length) {
+      notes = [{
+        id: genId(), title: 'Bem-vindo ao MedNotes',
+        tags: ['tutorial', 'cardiologia'],
+        created: Date.now(), updated: Date.now(),
+        content: [
+          '## Cardiologia Nuclear',
+          '',
+          'Este editor usa **markdown ao vivo** — os símbolos ficam visíveis e estilizados enquanto você escreve, igual ao Bear 2.',
+          '',
+          '### Formatação básica',
+          '- **negrito** com `**texto**`',
+          '- *itálico* com `*texto*`',
+          '- ~~tachado~~ com `~~texto~~`',
+          '- `código` com crase',
+          '',
+          '### Destaques',
+          'Use a barra de ferramentas para destacar: ==y:amarelo==, ==b:azul==, ==g:verde==, ==p:rosa==',
+          '',
+          '> Bloco de citação — ideal para definições importantes',
+          '',
+          '---',
+          '',
+          '| Exame           | Sensibilidade |',
+          '|-----------------|---------------|',
+          '| Cintilografia   | 87%           |',
+          '| PET-CT          | 95%           |',
+          '',
+          '### Atalhos',
+          '- `Ctrl+B` → negrito',
+          '- `Ctrl+I` → itálico',
+          '- `Ctrl+S` → salvar',
+        ].join('\n')
+      }];
+      persist();
+    }
 
-function handleInput(){
-  // Extract text content preserving newlines
-  const raw = extractTextWithNewlines(liveEl);
-  currentRawMd = raw;
-  scheduleRender();
-  scheduleSave();
-}
+    /* ── Bear-style syntax highlighter ──────────────────────────── */
+    /*
+     * We keep raw markdown in <textarea> and mirror it to a highlight
+     * <div> with the same font/padding/size. Only the div gets colours;
+     * the textarea is transparent (caret-color only).
+     */
+    function escHtml(s) {
+      return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
 
-function extractTextWithNewlines(el){
-  let text='';
-  function walk(node){
-    if(node.nodeType===Node.TEXT_NODE){text+=node.textContent;}
-    else if(node.nodeType===Node.ELEMENT_NODE){
-      const tag=node.tagName.toLowerCase();
-      if(tag==='br'){text+='\n';}
-      else if(['p','div','h1','h2','h3','h4','h5','h6','li','tr','blockquote','pre'].includes(tag)){
-        if(text.length&&!text.endsWith('\n')) text+='\n';
-        node.childNodes.forEach(walk);
-        if(!text.endsWith('\n')) text+='\n';
-      } else if(tag==='td'||tag==='th'){
-        node.childNodes.forEach(walk);
-        text+=' | ';
-      } else {
-        node.childNodes.forEach(walk);
+    function highlightLine(raw) {
+      let s = escHtml(raw);
+
+      // Headings
+      if (/^### /.test(raw)) return `<span class="md-h3">${s}</span>`;
+      if (/^## /.test(raw))  return `<span class="md-h2">${s}</span>`;
+      if (/^# /.test(raw))   return `<span class="md-h1">${s}</span>`;
+
+      // Blockquote
+      if (/^> /.test(raw)) return `<span class="md-quote">${s}</span>`;
+
+      // HR
+      if (/^---+$/.test(raw.trim())) return `<span class="md-hr">${s}</span>`;
+
+      // Table row
+      if (/^\|/.test(raw)) {
+        s = s.replace(/(\|)/g, '<span class="md-sym">$1</span>');
+        return s;
       }
+
+      // Unordered list marker
+      s = s.replace(/^(\s*)([-*+] )/, '$1<span class="md-ul">$2</span>');
+
+      // Ordered list marker
+      s = s.replace(/^(\s*)(\d+\. )/, '$1<span class="md-ol">$2</span>');
+
+      // Inline: custom highlights ==y:text==
+      s = s.replace(/==([ybgp]):(.*?)==/g, (_, k, t) => `<span class="md-hl-${k}">${t}</span>`);
+
+      // Inline: colour spans (pass through)
+      s = s.replace(/(&lt;span style=&quot;color:(.*?)&quot;&gt;)(.*?)(&lt;\/span&gt;)/g,
+        (_, open, color, text) =>
+          `<span style="color:${color}">${text}</span>`
+      );
+
+      // Bold+italic ***text***
+      s = s.replace(/\*\*\*(.*?)\*\*\*/g,
+        '<span class="md-sym">***</span><span class="md-bold md-italic">$1</span><span class="md-sym">***</span>');
+
+      // Bold **text**
+      s = s.replace(/\*\*(.*?)\*\*/g,
+        '<span class="md-sym">**</span><span class="md-bold">$1</span><span class="md-sym">**</span>');
+
+      // Italic *text* (avoid ** already consumed)
+      s = s.replace(/(?<!\*)\*(?!\*)([^*]+?)(?<!\*)\*(?!\*)/g,
+        '<span class="md-sym">*</span><span class="md-italic">$1</span><span class="md-sym">*</span>');
+
+      // Strikethrough ~~text~~
+      s = s.replace(/~~(.*?)~~/g,
+        '<span class="md-sym">~~</span><span class="md-strike">$1</span><span class="md-sym">~~</span>');
+
+      // Inline code `text`
+      s = s.replace(/`([^`]+)`/g,
+        '<span class="md-sym">`</span><span class="md-code">$1</span><span class="md-sym">`</span>');
+
+      // Image ![alt](url)
+      s = s.replace(/!\[(.*?)\]\((.*?)\)/g,
+        '<span class="md-img">![$1]($2)</span>');
+
+      // Link [text](url)
+      s = s.replace(/\[(.*?)\]\((.*?)\)/g,
+        '<span class="md-sym">[</span><span class="md-link">$1</span><span class="md-sym">]($2)</span>');
+
+      // Bear-style #tag (word boundary, not inside code)
+      s = s.replace(/(^|\s)(#[a-z0-9_\-áéíóúãõç]+)/gi,
+        '$1<span class="md-tag">$2</span>');
+
+      return s;
     }
-  }
-  el.childNodes.forEach(walk);
-  return text.replace(/\n{3,}/g,'\n\n').trimEnd();
-}
 
-let renderTimer=null;
-function scheduleRender(){
-  clearTimeout(renderTimer);
-  renderTimer=setTimeout(()=>{
-    if(!activeId) return;
-    const sel=window.getSelection();
-    // Save cursor position as char offset
-    const pos=getCursorOffset();
-    isRendering=true;
-    liveEl.innerHTML=mdToHtml(currentRawMd);
-    isRendering=false;
-    setCursorOffset(pos);
-  },120);
-}
-
-function getCursorOffset(){
-  const sel=window.getSelection();
-  if(!sel.rangeCount) return -1;
-  const range=sel.getRangeAt(0);
-  const pre=range.cloneRange();
-  pre.selectNodeContents(liveEl);
-  pre.setEnd(range.startContainer,range.startOffset);
-  return pre.toString().length;
-}
-
-function setCursorOffset(offset){
-  if(offset<0) return;
-  try{
-    const range=document.createRange();
-    const sel=window.getSelection();
-    let charCount=0,found=false;
-    function walk(node){
-      if(found) return;
-      if(node.nodeType===Node.TEXT_NODE){
-        const next=charCount+node.textContent.length;
-        if(next>=offset){range.setStart(node,offset-charCount);range.collapse(true);found=true;}
-        else{charCount=next;}
-      } else {node.childNodes.forEach(walk);}
+    function buildHighlight(text) {
+      return text.split('\n').map(highlightLine).join('\n');
     }
-    walk(liveEl);
-    if(!found){range.selectNodeContents(liveEl);range.collapse(false);}
-    sel.removeAllRanges();sel.addRange(range);
-  }catch(e){}
-}
 
-// Keyboard shortcuts inside live editor
-liveEl.addEventListener('keydown',e=>{
-  if(e.ctrlKey||e.metaKey){
-    if(e.key==='b'){e.preventDefault();wrapInline('**');}
-    if(e.key==='i'){e.preventDefault();wrapInline('*');}
-    if(e.key==='s'){e.preventDefault();forceSave();}
-  }
-  if(e.key==='Enter'){
-    // Let default handle, then re-render
-    setTimeout(handleInput,0);
-  }
-  if(e.key==='Tab'){
-    e.preventDefault();
-    document.execCommand('insertText',false,'  ');
-    handleInput();
-  }
-});
+    /* ── DOM refs ────────────────────────────────────────────────── */
+    const ta      = document.getElementById('editor-ta');
+    const hl      = document.getElementById('editor-highlight');
+    const scroll  = document.getElementById('editor-scroll');
+    const titleEl = document.getElementById('note-title');
+    const tagsRow = document.getElementById('etags');
+    const tagIn   = document.getElementById('tag-input');
+    const noteWrap= document.getElementById('note-wrap');
+    const emptyEl = document.getElementById('empty-state');
 
-function wrapInline(marker){
-  const sel=window.getSelection();
-  if(!sel.rangeCount) return;
-  const range=sel.getRangeAt(0);
-  const selected=range.toString()||'texto';
-  document.execCommand('insertText',false,marker+selected+marker);
-  handleInput();
-}
+    /* ── Sync textarea height & highlight ───────────────────────── */
+    function syncHighlight() {
+      hl.innerHTML = buildHighlight(ta.value);
+      // Keep textarea height >= highlight div so scroll works on parent
+      ta.style.height = 'auto';
+      ta.style.height = Math.max(ta.scrollHeight, scroll.clientHeight) + 'px';
+    }
 
-function wrapBlock(prefix){
-  // Insert at start of current line in raw md
-  const pos=getCursorOffset();
-  const lines=currentRawMd.split('\n');
-  let count=0,lineIdx=0;
-  for(let i=0;i<lines.length;i++){count+=lines[i].length+1;if(count>pos){lineIdx=i;break;}}
-  lines[lineIdx]=prefix+lines[lineIdx];
-  currentRawMd=lines.join('\n');
-  isRendering=true;
-  liveEl.innerHTML=mdToHtml(currentRawMd);
-  isRendering=false;
-  scheduleSave();
-}
+    /* ── Open note ───────────────────────────────────────────────── */
+    function openNote(id) {
+      activeId = id;
+      const n = getNote(id);
+      if (!n) return;
+      emptyEl.style.display = 'none';
+      noteWrap.style.display = 'flex';
+      noteWrap.style.flex = '1';
+      noteWrap.style.flexDirection = 'column';
+      noteWrap.style.overflow = 'hidden';
+      titleEl.value = n.title || '';
+      ta.value = n.content || '';
+      syncHighlight();
+      renderTags(n.tags || []);
+      renderSidebar();
+      ta.focus();
+    }
 
-function insertAtCursor(text){
-  liveEl.focus();
-  document.execCommand('insertText',false,text);
-  handleInput();
-}
+    /* ── Save ────────────────────────────────────────────────────── */
+    function scheduleSave() {
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(forceSave, 600);
+    }
+    function forceSave() {
+      if (!activeId) return;
+      const n = getNote(activeId);
+      if (!n) return;
+      n.title   = titleEl.value;
+      n.content = ta.value;
+      n.updated = Date.now();
+      persist();
+      renderSidebar();
+    }
 
-// Toolbar commands
-document.querySelectorAll('.tb-btn[data-cmd]').forEach(btn=>{
-  btn.addEventListener('click',()=>{
-    const cmd=btn.dataset.cmd;
-    liveEl.focus();
-    if(cmd==='bold') wrapInline('**');
-    else if(cmd==='italic') wrapInline('*');
-    else if(cmd==='strike') wrapInline('~~');
-    else if(cmd==='code') wrapInline('`');
-    else if(cmd==='ul') insertAtCursor('\n- ');
-    else if(cmd==='ol') insertAtCursor('\n1. ');
-    else if(cmd==='quote') insertAtCursor('\n> ');
-    else if(cmd==='hr') insertAtCursor('\n---\n');
-    else if(cmd==='table') insertAtCursor('\n| Col 1 | Col 2 | Col 3 |\n|-------|-------|-------|\n| dado  | dado  | dado  |\n');
-  });
-});
+    /* ── Textarea events ─────────────────────────────────────────── */
+    ta.addEventListener('input', () => { syncHighlight(); scheduleSave(); });
+    ta.addEventListener('scroll', () => { hl.style.transform = `translateY(-${ta.scrollTop}px)`; });
+    titleEl.addEventListener('input', scheduleSave);
 
-document.getElementById('heading-sel').addEventListener('change',function(){
-  if(!this.value) return;
-  liveEl.focus();
-  insertAtCursor('\n'+this.value);
-  this.value='';
-});
+    // Sync scroll of hl to match textarea scroll
+    scroll.addEventListener('scroll', () => {
+      hl.style.top = (-scroll.scrollTop) + 'px';
+    });
 
-document.getElementById('apply-color').addEventListener('click',()=>{
-  const c=document.getElementById('color-picker').value;
-  liveEl.focus();
-  const sel=window.getSelection();
-  const txt=sel.rangeCount?sel.getRangeAt(0).toString()||'texto':'texto';
-  document.execCommand('insertText',false,`<span style="color:${c}">${txt}</span>`);
-  handleInput();
-});
+    // Keyboard shortcuts
+    ta.addEventListener('keydown', e => {
+      const ctrl = e.ctrlKey || e.metaKey;
+      if (ctrl && e.key === 'b') { e.preventDefault(); wrap('**', '**'); }
+      if (ctrl && e.key === 'i') { e.preventDefault(); wrap('*',  '*' ); }
+      if (ctrl && e.key === 's') { e.preventDefault(); forceSave();      }
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        insertAt('  ');
+      }
+    });
 
-document.getElementById('hl-select').addEventListener('change',function(){
-  if(!this.value) return;
-  const v=this.value;
-  liveEl.focus();
-  const sel=window.getSelection();
-  const txt=sel.rangeCount?sel.getRangeAt(0).toString()||'texto':'texto';
-  document.execCommand('insertText',false,`==${v}:${txt}==`);
-  handleInput();
-  this.value='';
-});
+    /* ── Inline helpers ──────────────────────────────────────────── */
+    function wrap(before, after) {
+      const s = ta.selectionStart, e = ta.selectionEnd;
+      const sel = ta.value.slice(s, e) || 'texto';
+      const rep = before + sel + after;
+      ta.setRangeText(rep, s, e, 'select');
+      // Position cursor inside the markers
+      ta.selectionStart = s + before.length;
+      ta.selectionEnd   = s + before.length + sel.length;
+      ta.focus();
+      syncHighlight(); scheduleSave();
+    }
 
-// ======== SAVE ========
-function scheduleSave(){
-  clearTimeout(saveTimer);
-  saveTimer=setTimeout(forceSave,800);
-}
-function forceSave(){
-  if(!activeId) return;
-  const n=getNote(activeId);
-  if(!n) return;
-  n.title=document.getElementById('note-title-input').value;
-  n.content=currentRawMd;
-  n.updated=Date.now();
-  saveNotes();
-  renderSidebar();
-}
+    function insertAt(text, collapse = true) {
+      const s = ta.selectionStart;
+      ta.setRangeText(text, s, ta.selectionEnd, 'end');
+      if (collapse) { ta.selectionStart = ta.selectionEnd = s + text.length; }
+      ta.focus();
+      syncHighlight(); scheduleSave();
+    }
 
-// ======== OPEN NOTE ========
-function openNote(id){
-  activeId=id;
-  const n=getNote(id);
-  if(!n) return;
-  document.getElementById('empty-state').style.display='none';
-  const ew=document.getElementById('editor-wrap');
-  ew.style.display='flex';
-  ew.style.flex='1';
-  ew.style.flexDirection='column';
-  ew.style.overflow='hidden';
-  document.getElementById('note-title-input').value=n.title||'';
-  currentRawMd=n.content||'';
-  liveEl.innerHTML=mdToHtml(currentRawMd);
-  renderCurrentTags(n.tags||[]);
-  renderSidebar();
-}
+    function insertLinePrefix(prefix) {
+      const s = ta.selectionStart;
+      const lineStart = ta.value.lastIndexOf('\n', s - 1) + 1;
+      ta.setRangeText(prefix, lineStart, lineStart, 'end');
+      ta.selectionStart = ta.selectionEnd = lineStart + prefix.length;
+      ta.focus();
+      syncHighlight(); scheduleSave();
+    }
 
-// ======== TAGS ========
-function renderCurrentTags(tags){
-  const ct=document.getElementById('current-tags');
-  ct.innerHTML=tags.map(t=>`<span class="edit-tag">#${t}<span class="rm-tag" data-tag="${t}">×</span></span>`).join('');
-  ct.querySelectorAll('.rm-tag').forEach(el=>el.addEventListener('click',()=>{
-    const n=getNote(activeId);if(!n)return;
-    n.tags=(n.tags||[]).filter(x=>x!==el.dataset.tag);
-    saveNotes();renderCurrentTags(n.tags);renderSidebar();
-  }));
-}
+    /* ── Toolbar ─────────────────────────────────────────────────── */
+    document.querySelectorAll('.tb-btn[data-cmd]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const cmd = btn.dataset.cmd;
+        ta.focus();
+        if      (cmd === 'bold')   wrap('**', '**');
+        else if (cmd === 'italic') wrap('*',  '*' );
+        else if (cmd === 'strike') wrap('~~', '~~');
+        else if (cmd === 'code')   wrap('`',  '`' );
+        else if (cmd === 'ul')    insertLinePrefix('- ');
+        else if (cmd === 'ol')    insertLinePrefix('1. ');
+        else if (cmd === 'quote') insertLinePrefix('> ');
+        else if (cmd === 'hr')    insertAt('\n---\n');
+        else if (cmd === 'table') insertAt('\n| Col 1 | Col 2 | Col 3 |\n|-------|-------|-------|\n| dado  | dado  | dado  |\n');
+      });
+    });
 
-document.getElementById('new-tag-input').addEventListener('keydown',e=>{
-  if(['Enter',',',' '].includes(e.key)){
-    e.preventDefault();
-    const val=e.target.value.trim().toLowerCase().replace(/[^a-z0-9\-_áéíóúâêîôûãõçà]/gi,'');
-    if(!val) return;
-    const n=getNote(activeId);if(!n)return;
-    if(!(n.tags||[]).includes(val)){n.tags=[...(n.tags||[]),val];saveNotes();renderCurrentTags(n.tags);renderSidebar();}
-    e.target.value='';
-  }
-  if(e.key==='Backspace'&&!e.target.value){
-    const n=getNote(activeId);if(!n||!n.tags.length)return;
-    n.tags=n.tags.slice(0,-1);saveNotes();renderCurrentTags(n.tags);renderSidebar();
-  }
-});
+    document.getElementById('heading-sel').addEventListener('change', function () {
+      if (!this.value) return;
+      insertLinePrefix(this.value);
+      this.value = '';
+    });
 
-// ======== SIDEBAR ========
-function allTags(){const s=new Set();notes.forEach(n=>(n.tags||[]).forEach(t=>s.add(t)));return [...s].sort();}
-function filteredNotes(){
-  let r=[...notes];
-  if(filterTags.length) r=r.filter(n=>filterTags.every(t=>(n.tags||[]).includes(t)));
-  if(searchQ){const q=searchQ.toLowerCase();r=r.filter(n=>(n.title||'').toLowerCase().includes(q)||(n.content||'').toLowerCase().includes(q)||(n.tags||[]).some(t=>t.toLowerCase().includes(q)));}
-  return r.sort((a,b)=>b.updated-a.updated);
-}
-function hlText(t){
-  if(!searchQ) return t;
-  const re=new RegExp('('+searchQ.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi');
-  return t.replace(re,'<mark class="sh">$1</mark>');
-}
+    document.getElementById('btn-color').addEventListener('click', () => {
+      const c = document.getElementById('color-picker').value;
+      const s = ta.selectionStart, e = ta.selectionEnd;
+      const sel = ta.value.slice(s, e) || 'texto';
+      insertAt(`<span style="color:${c}">${sel}</span>`, false);
+    });
 
-function renderSidebar(){
-  const tb=document.getElementById('tags-bar');
-  const tags=allTags();
-  tb.innerHTML=tags.length?tags.map(t=>`<span class="tag-filter${filterTags.includes(t)?' active':''}" data-tag="${t}">#${t}</span>`).join(''):'<span style="font-size:11px;color:var(--text-muted)">Sem tags ainda</span>';
-  tb.querySelectorAll('.tag-filter').forEach(el=>el.addEventListener('click',()=>{
-    const t=el.dataset.tag;
-    filterTags=filterTags.includes(t)?filterTags.filter(x=>x!==t):[...filterTags,t];
+    document.getElementById('hl-select').addEventListener('change', function () {
+      if (!this.value) return;
+      const s = ta.selectionStart, e = ta.selectionEnd;
+      const sel = ta.value.slice(s, e) || 'texto';
+      insertAt(`==${this.value}:${sel}==`, false);
+      this.value = '';
+    });
+
+    /* ── Tags ────────────────────────────────────────────────────── */
+    function renderTags(tags) {
+      tagsRow.innerHTML = tags.map(t =>
+        `<span class="etag">#${t}<span class="etag-rm" data-tag="${t}">×</span></span>`
+      ).join('');
+      tagsRow.querySelectorAll('.etag-rm').forEach(el => el.addEventListener('click', () => {
+        const n = getNote(activeId); if (!n) return;
+        n.tags = n.tags.filter(x => x !== el.dataset.tag);
+        persist(); renderTags(n.tags); renderSidebar();
+      }));
+    }
+
+    tagIn.addEventListener('keydown', e => {
+      if (['Enter', ',', ' '].includes(e.key)) {
+        e.preventDefault();
+        const val = tagIn.value.trim().toLowerCase().replace(/[^a-z0-9\-_áéíóúãõç]/gi, '');
+        if (!val) return;
+        const n = getNote(activeId); if (!n) return;
+        if (!n.tags.includes(val)) { n.tags.push(val); persist(); renderTags(n.tags); renderSidebar(); }
+        tagIn.value = '';
+      }
+      if (e.key === 'Backspace' && !tagIn.value) {
+        const n = getNote(activeId); if (!n || !n.tags.length) return;
+        n.tags.pop(); persist(); renderTags(n.tags); renderSidebar();
+      }
+    });
+
+    /* ── Sidebar ─────────────────────────────────────────────────── */
+    function allTags() {
+      const s = new Set();
+      notes.forEach(n => (n.tags || []).forEach(t => s.add(t)));
+      return [...s].sort();
+    }
+
+    function filteredNotes() {
+      let r = [...notes];
+      if (filterTags.length) r = r.filter(n => filterTags.every(t => (n.tags || []).includes(t)));
+      if (searchQ) {
+        const q = searchQ.toLowerCase();
+        r = r.filter(n =>
+          (n.title || '').toLowerCase().includes(q) ||
+          (n.content || '').toLowerCase().includes(q) ||
+          (n.tags || []).some(t => t.toLowerCase().includes(q))
+        );
+      }
+      return r.sort((a, b) => b.updated - a.updated);
+    }
+
+    function hlText(t) {
+      if (!searchQ) return escHtml(t);
+      const re = new RegExp('(' + searchQ.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+      return escHtml(t).replace(re, '<mark class="sh">$1</mark>');
+    }
+
+    function renderSidebar() {
+      const tags = allTags();
+      const tb = document.getElementById('tags-bar');
+      tb.innerHTML = tags.length
+        ? tags.map(t => `<span class="tag-pill${filterTags.includes(t) ? ' active' : ''}" data-tag="${t}">#${t}</span>`).join('')
+        : '<span style="font-size:11px;color:var(--text-muted)">Sem tags ainda</span>';
+      tb.querySelectorAll('.tag-pill').forEach(el => el.addEventListener('click', () => {
+        const t = el.dataset.tag;
+        filterTags = filterTags.includes(t) ? filterTags.filter(x => x !== t) : [...filterTags, t];
+        renderSidebar();
+      }));
+
+      const fn = filteredNotes();
+      const nl = document.getElementById('notes-list');
+      if (!fn.length) {
+        nl.innerHTML = '<div style="padding:20px 14px;font-size:12px;color:var(--text-muted)">Nenhuma nota encontrada</div>';
+        return;
+      }
+      nl.innerHTML = fn.map(n => {
+        const preview = (n.content || '').replace(/[#*`_>~=\[\]|]/g, '').slice(0, 80);
+        const date = new Date(n.updated).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+        return `<div class="note-item${n.id === activeId ? ' active' : ''}" data-id="${n.id}">
+          <div class="ni-title">${hlText(n.title || 'Sem título')}</div>
+          <div class="ni-preview">${hlText(preview)}</div>
+          ${(n.tags || []).length ? `<div class="ni-tags">${n.tags.map(t => `<span class="ni-tag">#${t}</span>`).join('')}</div>` : ''}
+          <div class="ni-date">${date}</div>
+        </div>`;
+      }).join('');
+      nl.querySelectorAll('.note-item').forEach(el =>
+        el.addEventListener('click', () => { forceSave(); openNote(+el.dataset.id); })
+      );
+    }
+
+    /* ── Controls ────────────────────────────────────────────────── */
+    document.getElementById('btn-new').addEventListener('click', () => {
+      forceSave();
+      const n = { id: genId(), title: 'Nova nota', content: '', tags: [], created: Date.now(), updated: Date.now() };
+      notes.unshift(n); persist(); openNote(n.id);
+    });
+
+    document.getElementById('btn-del').addEventListener('click', () => {
+      if (!activeId || !confirm('Excluir esta nota?')) return;
+      notes = notes.filter(n => n.id !== activeId);
+      persist(); activeId = null;
+      noteWrap.style.display = 'none';
+      emptyEl.style.display = 'flex';
+      renderSidebar();
+    });
+
+    document.getElementById('btn-toggle-sb').addEventListener('click', () =>
+      document.getElementById('sidebar').classList.toggle('collapsed')
+    );
+
+    document.getElementById('btn-theme').addEventListener('click', () => {
+      document.body.dataset.theme = document.body.dataset.theme === 'dark' ? 'light' : 'dark';
+    });
+
+    document.getElementById('search').addEventListener('input', function () {
+      searchQ = this.value.trim(); renderSidebar();
+    });
+
+    /* ── Images ──────────────────────────────────────────────────── */
+    document.getElementById('btn-img').addEventListener('click', () =>
+      document.getElementById('img-panel').classList.toggle('open')
+    );
+    document.getElementById('btn-img-close').addEventListener('click', () =>
+      document.getElementById('img-panel').classList.remove('open')
+    );
+    document.getElementById('img-file').addEventListener('change', function () {
+      [...this.files].forEach(insertImage); this.value = '';
+    });
+
+    function insertImage(file) {
+      const r = new FileReader();
+      r.onload = e => {
+        insertAt(`\n![${escHtml(file.name)}](${e.target.result})\n`);
+      };
+      r.readAsDataURL(file);
+    }
+
+    ta.addEventListener('paste', e => {
+      const img = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith('image/'));
+      if (img) { e.preventDefault(); insertImage(img.getAsFile()); }
+    });
+
+    /* ── Init ────────────────────────────────────────────────────── */
     renderSidebar();
-  }));
-  const nl=document.getElementById('notes-list');
-  const fn=filteredNotes();
-  if(!fn.length){nl.innerHTML='<div style="padding:20px 14px;font-size:12px;color:var(--text-muted)">Nenhuma nota encontrada</div>';return;}
-  nl.innerHTML=fn.map(n=>{
-    const preview=(n.content||'').replace(/[#*`_>~=\[\]]/g,'').slice(0,75);
-    const date=new Date(n.updated).toLocaleDateString('pt-BR',{day:'2-digit',month:'short'});
-    return `<div class="note-item${n.id===activeId?' active':''}" data-id="${n.id}">
-      <div class="ni-title">${hlText(n.title||'Sem título')}</div>
-      <div class="ni-preview">${hlText(preview)}</div>
-      ${(n.tags||[]).length?`<div class="ni-tags">${n.tags.map(t=>`<span class="ni-tag">#${t}</span>`).join('')}</div>`:''}
-      <div class="ni-date">${date}</div>
-    </div>`;
-  }).join('');
-  nl.querySelectorAll('.note-item').forEach(el=>el.addEventListener('click',()=>{forceSave();openNote(+el.dataset.id);}));
-}
+    if (notes.length) openNote(notes[0].id);
 
-// ======== CONTROLS ========
-document.getElementById('new-note-btn').addEventListener('click',()=>{
-  forceSave();
-  const n={id:genId(),title:'Nova nota',content:'',tags:[],created:Date.now(),updated:Date.now()};
-  notes.unshift(n);saveNotes();openNote(n.id);liveEl.focus();
-});
-
-document.getElementById('del-note-btn').addEventListener('click',()=>{
-  if(!activeId||!confirm('Excluir esta nota?')) return;
-  notes=notes.filter(n=>n.id!==activeId);
-  saveNotes();activeId=null;
-  document.getElementById('editor-wrap').style.display='none';
-  document.getElementById('empty-state').style.display='flex';
-  renderSidebar();
-});
-
-document.getElementById('note-title-input').addEventListener('input',scheduleSave);
-document.getElementById('search').addEventListener('input',function(){searchQ=this.value.trim();renderSidebar();});
-document.getElementById('toggle-sidebar').addEventListener('click',()=>document.getElementById('sidebar').classList.toggle('collapsed'));
-document.getElementById('theme-btn').addEventListener('click',()=>{document.body.dataset.theme=document.body.dataset.theme==='dark'?'light':'dark';});
-
-// ======== IMAGES ========
-document.getElementById('img-btn').addEventListener('click',()=>document.getElementById('img-panel').classList.toggle('show'));
-document.getElementById('img-close').addEventListener('click',()=>document.getElementById('img-panel').classList.remove('show'));
-document.getElementById('img-file').addEventListener('change',function(){[...this.files].forEach(insertImg);this.value='';});
-
-function insertImg(file){
-  const r=new FileReader();
-  r.onload=e=>{
-    liveEl.focus();
-    document.execCommand('insertText',false,`\n![${file.name}](${e.target.result})\n`);
-    handleInput();
-  };
-  r.readAsDataURL(file);
-}
-
-liveEl.addEventListener('paste',e=>{
-  const items=[...(e.clipboardData?.items||[])];
-  const img=items.find(i=>i.type.startsWith('image/'));
-  if(img){e.preventDefault();insertImg(img.getAsFile());}
-});
-
-// ======== INIT ========
-renderSidebar();
-if(notes.length) openNote(notes[0].id);
-</script>
+    // Keep highlight in sync on window resize
+    window.addEventListener('resize', syncHighlight);
+  })();
+  </script>
 </body>
 </html>
