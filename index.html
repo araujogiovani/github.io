@@ -1,786 +1,379 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MedNotes</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minhas Notas - v1.2</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            transition: background-color 0.3s ease;
+        }
 
-  <style>
-    /* ── Reset & Tokens ───────────────────────────────────────────── */
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        .note-card {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            position: relative;
+            cursor: pointer;
+        }
 
-    :root {
-      --bg:           #f9f8f6;
-      --sidebar-bg:   #f2f0ec;
-      --note-bg:      #ffffff;
-      --text:         #1a1a1a;
-      --text-muted:   #999;
-      --border:       #e0ddd8;
-      --accent:       #c8533a;
-      --accent-light: #fdf0ee;
-      --toolbar-bg:   #fafaf8;
-      --tag-bg:       #eae6e0;
-      --tag-text:     #666;
-      --hover:        #ede9e3;
-      --sel:          #e2ddd6;
-      --font:         -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      --font-mono:    'SF Mono', Monaco, Consolas, monospace;
-      /* highlight colours */
-      --hl-y: #fff9c4; --hl-b: #d6eaff; --hl-g: #d6f5e3; --hl-p: #ffe0f0;
-    }
+        .note-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
 
-    [data-theme="dark"] {
-      --bg:           #1c1b19;
-      --sidebar-bg:   #232220;
-      --note-bg:      #2a2926;
-      --text:         #e8e5df;
-      --text-muted:   #777;
-      --border:       #383632;
-      --accent:       #e07055;
-      --accent-light: #3a2420;
-      --toolbar-bg:   #252422;
-      --tag-bg:       #333128;
-      --tag-text:     #aaa;
-      --hover:        #2e2c28;
-      --sel:          #35332e;
-      --hl-y: #4a4200; --hl-b: #0d2a4a; --hl-g: #0a3a1c; --hl-p: #4a0d2a;
-    }
+        .pinned-badge {
+            position: absolute;
+            top: -10px;
+            right: 10px;
+            background: #f59e0b;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: bold;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            z-index: 10;
+        }
 
-    body {
-      font-family: var(--font);
-      background: var(--bg);
-      color: var(--text);
-      height: 100vh;
-      display: flex;
-      overflow: hidden;
-      font-size: 15px;
-    }
+        /* Cores de categorias */
+        .color-gray { border-top: 4px solid #9ca3af; }
+        .color-blue { border-top: 4px solid #3b82f6; }
+        .color-green { border-top: 4px solid #10b981; }
+        .color-yellow { border-top: 4px solid #f59e0b; }
+        .color-red { border-top: 4px solid #ef4444; }
+        .color-purple { border-top: 4px solid #8b5cf6; }
 
-    /* ── Scrollbar ────────────────────────────────────────────────── */
-    ::-webkit-scrollbar { width: 5px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        /* Prevenir que botões fiquem estranhos ao clicar no card */
+        .action-btn {
+            position: relative;
+            z-index: 20;
+        }
 
-    /* ── Sidebar ──────────────────────────────────────────────────── */
-    #sidebar {
-      width: 260px;
-      min-width: 200px;
-      background: var(--sidebar-bg);
-      border-right: 1px solid var(--border);
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      transition: width .18s ease;
-      flex-shrink: 0;
-    }
-    #sidebar.collapsed { width: 0; min-width: 0; border: none; }
-
-    #sidebar-header { padding: 14px 14px 10px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
-    #app-title { font-size: 16px; font-weight: 700; color: var(--accent); margin-bottom: 10px; letter-spacing: -.3px; }
-
-    #search-wrap { position: relative; }
-    #search-icon { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 14px; pointer-events: none; }
-    #search { width: 100%; padding: 7px 10px 7px 30px; border: 1px solid var(--border); border-radius: 8px; background: var(--note-bg); color: var(--text); font-size: 13px; outline: none; transition: border-color .15s; }
-    #search:focus { border-color: var(--accent); }
-
-    #tags-bar { padding: 8px 14px; border-bottom: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: 4px; min-height: 38px; flex-shrink: 0; align-items: center; }
-    .tag-pill { padding: 2px 8px; border-radius: 12px; background: var(--tag-bg); color: var(--tag-text); font-size: 11px; cursor: pointer; user-select: none; transition: all .12s; }
-    .tag-pill.active { background: var(--accent); color: #fff; }
-
-    #notes-list { flex: 1; overflow-y: auto; }
-    .note-item { padding: 10px 14px; cursor: pointer; border-bottom: 1px solid var(--border); transition: background .1s; }
-    .note-item:hover { background: var(--hover); }
-    .note-item.active { background: var(--sel); }
-    .ni-title { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .ni-preview { font-size: 11px; color: var(--text-muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .ni-tags { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 4px; }
-    .ni-tag { font-size: 10px; padding: 1px 6px; border-radius: 8px; background: var(--tag-bg); color: var(--tag-text); }
-    .ni-date { font-size: 10px; color: var(--text-muted); margin-top: 3px; }
-
-    /* ── Main area ────────────────────────────────────────────────── */
-    #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
-
-    /* ── Toolbar ──────────────────────────────────────────────────── */
-    #toolbar {
-      padding: 7px 12px;
-      border-bottom: 1px solid var(--border);
-      background: var(--toolbar-bg);
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      flex-wrap: wrap;
-      flex-shrink: 0;
-    }
-    .tb-btn {
-      padding: 4px 8px;
-      border: 1px solid var(--border);
-      border-radius: 5px;
-      background: var(--note-bg);
-      color: var(--text);
-      cursor: pointer;
-      font-size: 12px;
-      line-height: 1.4;
-      display: flex;
-      align-items: center;
-      gap: 3px;
-      white-space: nowrap;
-      transition: background .1s;
-      font-family: var(--font);
-    }
-    .tb-btn:hover { background: var(--hover); }
-    .tb-sep { width: 1px; height: 18px; background: var(--border); margin: 0 2px; flex-shrink: 0; }
-    .tb-select { padding: 4px 6px; border: 1px solid var(--border); border-radius: 5px; background: var(--note-bg); color: var(--text); font-size: 12px; outline: none; cursor: pointer; font-family: var(--font); }
-    input[type="color"].tb-color { width: 26px; height: 26px; border: 1px solid var(--border); border-radius: 5px; padding: 2px; cursor: pointer; background: var(--note-bg); }
-
-    #btn-toggle-sb { font-size: 15px; cursor: pointer; background: none; border: none; color: var(--text-muted); padding: 4px 6px; border-radius: 5px; }
-    #btn-toggle-sb:hover { color: var(--text); background: var(--hover); }
-    #btn-new { margin-left: auto; padding: 5px 13px; background: var(--accent); color: #fff; border: none; border-radius: 7px; cursor: pointer; font-size: 13px; font-weight: 600; white-space: nowrap; font-family: var(--font); }
-    #btn-new:hover { opacity: .85; }
-    #btn-del { padding: 4px 8px; border: 1px solid var(--border); border-radius: 5px; background: none; color: var(--text-muted); cursor: pointer; font-size: 12px; font-family: var(--font); }
-    #btn-del:hover { background: #fee2e2; color: #c00; border-color: #fca5a5; }
-
-    /* ── Editor area ──────────────────────────────────────────────── */
-    #editor-area { flex: 1; overflow: hidden; display: flex; flex-direction: column; background: var(--note-bg); }
-
-    #empty-state {
-      flex: 1; display: flex; align-items: center; justify-content: center;
-      flex-direction: column; gap: 10px; color: var(--text-muted);
-      background: var(--note-bg);
-    }
-
-    #note-wrap { display: none; flex: 1; flex-direction: column; overflow: hidden; }
-
-    #note-title {
-      width: 100%; padding: 18px 40px 10px;
-      font-size: 24px; font-weight: 700;
-      border: none; outline: none;
-      background: transparent; color: var(--text);
-      border-bottom: 1px solid var(--border);
-      flex-shrink: 0; font-family: var(--font);
-    }
-
-    #tags-row {
-      padding: 6px 40px; border-bottom: 1px solid var(--border);
-      display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-      flex-shrink: 0; min-height: 34px;
-    }
-    .tags-label { font-size: 12px; color: var(--text-muted); }
-    .etag { font-size: 11px; padding: 2px 8px; border-radius: 10px; background: var(--accent-light); color: var(--accent); display: flex; align-items: center; gap: 3px; }
-    .etag-rm { cursor: pointer; font-size: 14px; line-height: 1; opacity: .7; }
-    .etag-rm:hover { opacity: 1; }
-    #tag-input { border: none; outline: none; background: transparent; color: var(--text); font-size: 12px; min-width: 80px; font-family: var(--font); }
-
-    /* ── Bear-style editor: textarea + highlight overlay ─────────── */
-    #editor-scroll {
-      flex: 1;
-      overflow-y: auto;
-      position: relative;
-    }
-
-    /*
-     * The trick: textarea and highlight div share identical
-     * font, size, padding, line-height so they overlap perfectly.
-     * The textarea is transparent (only caret visible);
-     * the highlight div renders coloured markdown on top.
-     */
-    #editor-highlight,
-    #editor-ta {
-      position: absolute;
-      top: 0; left: 0;
-      width: 100%;
-      min-height: 100%;
-      padding: 24px 40px 80px;
-      font-family: var(--font);
-      font-size: 16px;
-      line-height: 1.8;
-      tab-size: 2;
-      white-space: pre-wrap;
-      word-break: break-word;
-      overflow-wrap: break-word;
-    }
-
-    #editor-ta {
-      background: transparent;
-      color: transparent;
-      caret-color: var(--accent);
-      border: none;
-      outline: none;
-      resize: none;
-      z-index: 2;
-      height: 100%;
-      min-height: 400px;
-      overflow: hidden; /* scroll lives on parent */
-    }
-
-    #editor-highlight {
-      z-index: 1;
-      pointer-events: none;
-      color: var(--text);
-    }
-
-    /* ── Highlight syntax styles ──────────────────────────────────── */
-    .md-h1    { font-size: 1.7em;  font-weight: 700; color: var(--text); }
-    .md-h2    { font-size: 1.35em; font-weight: 700; color: var(--text); }
-    .md-h3    { font-size: 1.15em; font-weight: 700; color: var(--accent); }
-    .md-bold  { font-weight: 700; }
-    .md-italic{ font-style: italic; }
-    .md-strike{ text-decoration: line-through; color: var(--text-muted); }
-    .md-code  { font-family: var(--font-mono); font-size: .88em; background: var(--tag-bg); border-radius: 3px; padding: 0 4px; color: var(--accent); }
-    .md-link  { color: var(--accent); text-decoration: underline; }
-    .md-img   { color: var(--accent); font-style: italic; }
-    .md-quote { color: var(--text-muted); border-left: 3px solid var(--accent); padding-left: 10px; display: block; background: var(--accent-light); }
-    .md-hr    { color: var(--text-muted); }
-    .md-ul    { color: var(--accent); font-weight: 700; } /* bullet marker */
-    .md-ol    { color: var(--accent); font-weight: 700; }
-    .md-sym   { color: var(--text-muted); font-size: .85em; } /* markdown symbols dimmed */
-    .md-hl-y  { background: var(--hl-y); border-radius: 2px; }
-    .md-hl-b  { background: var(--hl-b); border-radius: 2px; }
-    .md-hl-g  { background: var(--hl-g); border-radius: 2px; }
-    .md-hl-p  { background: var(--hl-p); border-radius: 2px; }
-    .md-tag   { color: var(--accent); font-weight: 600; }
-
-    /* ── Image drop panel ─────────────────────────────────────────── */
-    #img-panel {
-      display: none;
-      padding: 9px 40px;
-      border-top: 1px solid var(--border);
-      background: var(--toolbar-bg);
-      align-items: center;
-      gap: 10px;
-      flex-shrink: 0;
-    }
-    #img-panel.open { display: flex; }
-    #img-file { display: none; }
-    #img-label {
-      padding: 5px 12px; border: 1px solid var(--border); border-radius: 6px;
-      cursor: pointer; font-size: 12px; background: var(--note-bg);
-      font-family: var(--font);
-    }
-    #img-label:hover { background: var(--hover); }
-
-    /* Search highlight */
-    mark.sh { background: #ffeb3b; border-radius: 2px; padding: 0 1px; }
-  </style>
+        [v-cloak] { display: none; }
+    </style>
 </head>
-<body data-theme="light">
+<body class="bg-gray-50 text-gray-900 min-h-screen pb-12">
 
-  <!-- ══ SIDEBAR ══════════════════════════════════════════════════ -->
-  <div id="sidebar">
-    <div id="sidebar-header">
-      <div id="app-title">MedNotes</div>
-      <div id="search-wrap">
-        <span id="search-icon">⌕</span>
-        <input id="search" type="text" placeholder="Pesquisar notas, tags…" />
-      </div>
-    </div>
-    <div id="tags-bar"></div>
-    <div id="notes-list"></div>
-  </div>
+    <div id="app" class="max-w-5xl mx-auto px-4 py-8">
+        <!-- Header -->
+        <header class="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-800 flex items-center">
+                    <i class="fas fa-sticky-note mr-3 text-yellow-500"></i>
+                    Minhas Notas <span class="text-xs font-normal text-gray-400 ml-2">v1.2</span>
+                </h1>
+                <p class="text-gray-500">Clique em qualquer nota para editá-la.</p>
+            </div>
+            
+            <div class="flex items-center gap-3">
+                <div class="relative flex-1 md:w-64">
+                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
+                        <i class="fas fa-search"></i>
+                    </span>
+                    <input 
+                        type="text" 
+                        id="searchBox"
+                        placeholder="Pesquisar notas..." 
+                        class="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                    >
+                </div>
+                <button 
+                    onclick="openModal()"
+                    class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition flex items-center shadow-md"
+                >
+                    <i class="fas fa-plus mr-2"></i> Nova Nota
+                </button>
+            </div>
+        </header>
 
-  <!-- ══ MAIN ═════════════════════════════════════════════════════ -->
-  <div id="main">
-
-    <!-- Toolbar -->
-    <div id="toolbar">
-      <button id="btn-toggle-sb" title="Sidebar">☰</button>
-      <button id="btn-new">+ Nova nota</button>
-      <div class="tb-sep"></div>
-      <button class="tb-btn" data-cmd="bold"   title="Negrito Ctrl+B"><b>B</b></button>
-      <button class="tb-btn" data-cmd="italic" title="Itálico Ctrl+I"><i>I</i></button>
-      <button class="tb-btn" data-cmd="strike" title="Tachado">S̶</button>
-      <button class="tb-btn" data-cmd="code"   title="Código">&lt;/&gt;</button>
-      <div class="tb-sep"></div>
-      <input  type="color" class="tb-color" id="color-picker" value="#c8533a" title="Cor do texto" />
-      <button class="tb-btn" id="btn-color" title="Aplicar cor"><span style="border-bottom:2px solid #c8533a;padding-bottom:1px">A</span></button>
-      <select class="tb-select" id="hl-select" title="Destacar texto">
-        <option value="">Destacar</option>
-        <option value="y">🟡 Amarelo</option>
-        <option value="b">🔵 Azul</option>
-        <option value="g">🟢 Verde</option>
-        <option value="p">🩷 Rosa</option>
-      </select>
-      <div class="tb-sep"></div>
-      <select class="tb-select" id="heading-sel">
-        <option value="">Título…</option>
-        <option value="# ">H1</option>
-        <option value="## ">H2</option>
-        <option value="### ">H3</option>
-      </select>
-      <button class="tb-btn" data-cmd="ul"    >• Lista</button>
-      <button class="tb-btn" data-cmd="ol"    >1. Lista</button>
-      <button class="tb-btn" data-cmd="quote" >❝</button>
-      <button class="tb-btn" data-cmd="hr"    >—</button>
-      <button class="tb-btn" data-cmd="table" >⊞ Tabela</button>
-      <div class="tb-sep"></div>
-      <button class="tb-btn" id="btn-img">🖼 Imagem</button>
-      <div class="tb-sep"></div>
-      <button class="tb-btn" id="btn-theme" title="Tema">◑</button>
-      <button id="btn-del"   title="Excluir nota">🗑</button>
-    </div>
-
-    <!-- Editor area -->
-    <div id="editor-area">
-
-      <div id="empty-state">
-        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".3">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-          <polyline points="14,2 14,8 20,8"/>
-          <line x1="16" y1="13" x2="8" y2="13"/>
-          <line x1="16" y1="17" x2="8" y2="17"/>
-        </svg>
-        <p style="font-size:14px">Selecione ou crie uma nota</p>
-      </div>
-
-      <div id="note-wrap">
-        <input id="note-title" type="text" placeholder="Título da nota…" />
-
-        <div id="tags-row">
-          <span class="tags-label">#</span>
-          <div id="etags"></div>
-          <input id="tag-input" type="text" placeholder="adicionar tag…" />
+        <!-- Empty State -->
+        <div id="emptyState" class="hidden flex flex-col items-center justify-center py-20 text-gray-400">
+            <i class="fas fa-folder-open text-6xl mb-4"></i>
+            <p class="text-xl">Nenhuma nota encontrada.</p>
+            <button onclick="openModal()" class="mt-4 text-blue-600 hover:underline">Crie a sua primeira nota agora!</button>
         </div>
 
-        <div id="editor-scroll">
-          <!-- Highlight layer (rendered markdown syntax) -->
-          <div id="editor-highlight" aria-hidden="true"></div>
-          <!-- Input layer (transparent textarea) -->
-          <textarea id="editor-ta" spellcheck="false" autocorrect="off" autocomplete="off"></textarea>
+        <!-- Notes Grid -->
+        <div id="notesGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- Notas serão injetadas aqui -->
         </div>
-
-        <div id="img-panel">
-          <span style="font-size:12px;color:var(--text-muted)">Inserir imagem:</span>
-          <label id="img-label" for="img-file">📁 Escolher arquivo</label>
-          <input type="file" id="img-file" accept="image/*" multiple />
-          <span style="font-size:11px;color:var(--text-muted)">ou cole Ctrl+V no editor</span>
-          <button class="tb-btn" id="btn-img-close" style="margin-left:auto">✕ Fechar</button>
-        </div>
-      </div>
-
     </div>
-  </div>
 
-  <script>
-  (() => {
-    /* ── Storage ─────────────────────────────────────────────────── */
-    const STORE = 'mednotes_v3';
-    let notes = JSON.parse(localStorage.getItem(STORE) || '[]');
-    let activeId = null, filterTags = [], searchQ = '';
-    let saveTimer = null;
+    <!-- Modal for New/Edit Note -->
+    <div id="noteModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden transform transition-all">
+            <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                <h3 id="modalTitle" class="text-lg font-bold text-gray-800">Nova Nota</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <form id="noteForm" class="p-6">
+                <input type="hidden" id="noteId">
+                <div class="mb-4">
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Título</label>
+                    <input 
+                        type="text" 
+                        id="noteTitle" 
+                        required
+                        placeholder="Ex: Lista de Compras"
+                        class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                    >
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Conteúdo</label>
+                    <textarea 
+                        id="noteContent" 
+                        rows="5" 
+                        required
+                        placeholder="Escreva aqui os seus pensamentos..."
+                        class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none resize-none"
+                    ></textarea>
+                </div>
+                <div class="flex flex-col sm:flex-row justify-between gap-4 mb-6">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Cor da Categoria</label>
+                        <div class="flex gap-2">
+                            <label class="cursor-pointer">
+                                <input type="radio" name="color" value="gray" checked class="hidden peer">
+                                <div class="w-7 h-7 rounded-full bg-gray-400 border-2 border-transparent peer-checked:border-black peer-checked:scale-110 transition"></div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="color" value="blue" class="hidden peer">
+                                <div class="w-7 h-7 rounded-full bg-blue-500 border-2 border-transparent peer-checked:border-black peer-checked:scale-110 transition"></div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="color" value="green" class="hidden peer">
+                                <div class="w-7 h-7 rounded-full bg-emerald-500 border-2 border-transparent peer-checked:border-black peer-checked:scale-110 transition"></div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="color" value="yellow" class="hidden peer">
+                                <div class="w-7 h-7 rounded-full bg-amber-500 border-2 border-transparent peer-checked:border-black peer-checked:scale-110 transition"></div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="color" value="red" class="hidden peer">
+                                <div class="w-7 h-7 rounded-full bg-rose-500 border-2 border-transparent peer-checked:border-black peer-checked:scale-110 transition"></div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="color" value="purple" class="hidden peer">
+                                <div class="w-7 h-7 rounded-full bg-purple-500 border-2 border-transparent peer-checked:border-black peer-checked:scale-110 transition"></div>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="flex items-center">
+                        <label class="flex items-center cursor-pointer group">
+                            <input type="checkbox" id="notePinned" class="hidden peer">
+                            <div class="w-10 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600 relative"></div>
+                            <span class="ml-2 text-sm font-semibold text-gray-700">Fixar no topo</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-3">
+                    <button 
+                        type="button" 
+                        onclick="closeModal()"
+                        class="px-4 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg transition"
+                    >
+                        Cancelar
+                    </button>
+                    <button 
+                        type="submit"
+                        class="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 shadow-md transition"
+                    >
+                        Guardar Nota
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-    function persist() { localStorage.setItem(STORE, JSON.stringify(notes)); }
-    function getNote(id) { return notes.find(n => n.id === id); }
-    function genId()  { return Date.now() + Math.random(); }
+    <!-- Feedback Message (Toast) -->
+    <div id="toast" class="fixed bottom-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-full shadow-2xl transition-all opacity-0 pointer-events-none z-50">
+        Operação realizada com sucesso!
+    </div>
 
-    if (!notes.length) {
-      notes = [{
-        id: genId(), title: 'Bem-vindo ao MedNotes',
-        tags: ['tutorial', 'cardiologia'],
-        created: Date.now(), updated: Date.now(),
-        content: [
-          '## Cardiologia Nuclear',
-          '',
-          'Este editor usa **markdown ao vivo** — os símbolos ficam visíveis e estilizados enquanto você escreve, igual ao Bear 2.',
-          '',
-          '### Formatação básica',
-          '- **negrito** com `**texto**`',
-          '- *itálico* com `*texto*`',
-          '- ~~tachado~~ com `~~texto~~`',
-          '- `código` com crase',
-          '',
-          '### Destaques',
-          'Use a barra de ferramentas para destacar: ==y:amarelo==, ==b:azul==, ==g:verde==, ==p:rosa==',
-          '',
-          '> Bloco de citação — ideal para definições importantes',
-          '',
-          '---',
-          '',
-          '| Exame           | Sensibilidade |',
-          '|-----------------|---------------|',
-          '| Cintilografia   | 87%           |',
-          '| PET-CT          | 95%           |',
-          '',
-          '### Atalhos',
-          '- `Ctrl+B` → negrito',
-          '- `Ctrl+I` → itálico',
-          '- `Ctrl+S` → salvar',
-        ].join('\n')
-      }];
-      persist();
-    }
+    <script>
+        // Estado do Aplicativo
+        let notes = JSON.parse(localStorage.getItem('my_personal_notes')) || [];
+        
+        // Elementos DOM
+        const notesGrid = document.getElementById('notesGrid');
+        const emptyState = document.getElementById('emptyState');
+        const noteModal = document.getElementById('noteModal');
+        const noteForm = document.getElementById('noteForm');
+        const searchBox = document.getElementById('searchBox');
+        const toast = document.getElementById('toast');
 
-    /* ── Bear-style syntax highlighter ──────────────────────────── */
-    /*
-     * We keep raw markdown in <textarea> and mirror it to a highlight
-     * <div> with the same font/padding/size. Only the div gets colours;
-     * the textarea is transparent (caret-color only).
-     */
-    function escHtml(s) {
-      return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    }
+        // Inicialização
+        window.onload = () => {
+            renderNotes();
+        };
 
-    function highlightLine(raw) {
-      let s = escHtml(raw);
+        // Funções de Renderização
+        function renderNotes(filter = '') {
+            let filteredNotes = notes.filter(note => 
+                note.title.toLowerCase().includes(filter.toLowerCase()) || 
+                note.content.toLowerCase().includes(filter.toLowerCase())
+            );
 
-      // Headings
-      if (/^### /.test(raw)) return `<span class="md-h3">${s}</span>`;
-      if (/^## /.test(raw))  return `<span class="md-h2">${s}</span>`;
-      if (/^# /.test(raw))   return `<span class="md-h1">${s}</span>`;
+            // Ordenação: Fixados primeiro, depois por data (mais recente)
+            filteredNotes.sort((a, b) => {
+                if (a.pinned === b.pinned) {
+                    return new Date(b.date) - new Date(a.date);
+                }
+                return a.pinned ? -1 : 1;
+            });
 
-      // Blockquote
-      if (/^> /.test(raw)) return `<span class="md-quote">${s}</span>`;
+            if (filteredNotes.length === 0) {
+                notesGrid.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            }
 
-      // HR
-      if (/^---+$/.test(raw.trim())) return `<span class="md-hr">${s}</span>`;
+            emptyState.classList.add('hidden');
+            notesGrid.innerHTML = filteredNotes.map(note => `
+                <div onclick="editNote('${note.id}')" class="note-card bg-white p-6 rounded-xl shadow-sm border border-gray-100 color-${note.color} flex flex-col h-full ${note.pinned ? 'ring-2 ring-yellow-400 ring-opacity-50' : ''}">
+                    ${note.pinned ? '<div class="pinned-badge"><i class="fas fa-thumbtack mr-1"></i> FIXADA</div>' : ''}
+                    <div class="flex justify-between items-start mb-3">
+                        <h3 class="font-bold text-lg text-gray-800 leading-tight pointer-events-none">${escapeHTML(note.title)}</h3>
+                        <div class="flex gap-2">
+                            <button onclick="event.stopPropagation(); togglePin('${note.id}')" class="action-btn ${note.pinned ? 'text-yellow-500' : 'text-gray-300'} hover:text-yellow-500 transition" title="Fixar nota">
+                                <i class="fas fa-thumbtack"></i>
+                            </button>
+                            <button onclick="event.stopPropagation(); deleteNote('${note.id}')" class="action-btn text-gray-300 hover:text-red-500 transition" title="Eliminar">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <p class="text-gray-600 flex-grow whitespace-pre-wrap text-sm leading-relaxed mb-4 pointer-events-none">${escapeHTML(note.content)}</p>
+                    <div class="text-xs text-gray-400 mt-auto border-t pt-3 border-gray-50 pointer-events-none">
+                        ${new Date(note.date).toLocaleDateString('pt-PT')} às ${new Date(note.date).toLocaleTimeString('pt-PT', {hour: '2-digit', minute:'2-digit'})}
+                    </div>
+                </div>
+            `).join('');
+        }
 
-      // Table row
-      if (/^\|/.test(raw)) {
-        s = s.replace(/(\|)/g, '<span class="md-sym">$1</span>');
-        return s;
-      }
+        // CRUD
+        noteForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            const id = document.getElementById('noteId').value;
+            const title = document.getElementById('noteTitle').value;
+            const content = document.getElementById('noteContent').value;
+            const color = document.querySelector('input[name="color"]:checked').value;
+            const pinned = document.getElementById('notePinned').checked;
 
-      // Unordered list marker
-      s = s.replace(/^(\s*)([-*+] )/, '$1<span class="md-ul">$2</span>');
+            if (id) {
+                // Editar
+                const index = notes.findIndex(n => n.id === id);
+                notes[index] = { ...notes[index], title, content, color, pinned, date: new Date().toISOString() };
+                showToast("Nota atualizada!");
+            } else {
+                // Criar
+                const newNote = {
+                    id: Date.now().toString(),
+                    title,
+                    content,
+                    color,
+                    pinned,
+                    date: new Date().toISOString()
+                };
+                notes.unshift(newNote);
+                showToast("Nota criada com sucesso!");
+            }
 
-      // Ordered list marker
-      s = s.replace(/^(\s*)(\d+\. )/, '$1<span class="md-ol">$2</span>');
+            saveNotes();
+            closeModal();
+            renderNotes();
+        });
 
-      // Inline: custom highlights ==y:text==
-      s = s.replace(/==([ybgp]):(.*?)==/g, (_, k, t) => `<span class="md-hl-${k}">${t}</span>`);
+        function togglePin(id) {
+            const index = notes.findIndex(n => n.id === id);
+            if (index !== -1) {
+                notes[index].pinned = !notes[index].pinned;
+                saveNotes();
+                renderNotes(searchBox.value);
+            }
+        }
 
-      // Inline: colour spans (pass through)
-      s = s.replace(/(&lt;span style=&quot;color:(.*?)&quot;&gt;)(.*?)(&lt;\/span&gt;)/g,
-        (_, open, color, text) =>
-          `<span style="color:${color}">${text}</span>`
-      );
+        function deleteNote(id) {
+            if (confirm("Tem a certeza que deseja eliminar esta nota?")) {
+                notes = notes.filter(n => n.id !== id);
+                saveNotes();
+                renderNotes(searchBox.value);
+                showToast("Nota eliminada.");
+            }
+        }
 
-      // Bold+italic ***text***
-      s = s.replace(/\*\*\*(.*?)\*\*\*/g,
-        '<span class="md-sym">***</span><span class="md-bold md-italic">$1</span><span class="md-sym">***</span>');
+        function editNote(id) {
+            const note = notes.find(n => n.id === id);
+            if (!note) return;
 
-      // Bold **text**
-      s = s.replace(/\*\*(.*?)\*\*/g,
-        '<span class="md-sym">**</span><span class="md-bold">$1</span><span class="md-sym">**</span>');
+            document.getElementById('modalTitle').innerText = "Editar Nota";
+            document.getElementById('noteId').value = note.id;
+            document.getElementById('noteTitle').value = note.title;
+            document.getElementById('noteContent').value = note.content;
+            document.getElementById('notePinned').checked = note.pinned || false;
+            
+            // Set radio color
+            const radios = document.getElementsByName('color');
+            radios.forEach(r => {
+                if (r.value === note.color) r.checked = true;
+            });
 
-      // Italic *text* (avoid ** already consumed)
-      s = s.replace(/(?<!\*)\*(?!\*)([^*]+?)(?<!\*)\*(?!\*)/g,
-        '<span class="md-sym">*</span><span class="md-italic">$1</span><span class="md-sym">*</span>');
+            openModal();
+        }
 
-      // Strikethrough ~~text~~
-      s = s.replace(/~~(.*?)~~/g,
-        '<span class="md-sym">~~</span><span class="md-strike">$1</span><span class="md-sym">~~</span>');
+        // Utilitários
+        function saveNotes() {
+            localStorage.setItem('my_personal_notes', JSON.stringify(notes));
+        }
 
-      // Inline code `text`
-      s = s.replace(/`([^`]+)`/g,
-        '<span class="md-sym">`</span><span class="md-code">$1</span><span class="md-sym">`</span>');
+        function openModal() {
+            noteModal.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+            setTimeout(() => {
+                document.getElementById('noteTitle').focus();
+            }, 100);
+        }
 
-      // Image ![alt](url)
-      s = s.replace(/!\[(.*?)\]\((.*?)\)/g,
-        '<span class="md-img">![$1]($2)</span>');
+        function closeModal() {
+            noteModal.classList.add('hidden');
+            document.body.style.overflow = 'auto';
+            noteForm.reset();
+            document.getElementById('noteId').value = '';
+            document.getElementById('notePinned').checked = false;
+            document.getElementById('modalTitle').innerText = "Nova Nota";
+        }
 
-      // Link [text](url)
-      s = s.replace(/\[(.*?)\]\((.*?)\)/g,
-        '<span class="md-sym">[</span><span class="md-link">$1</span><span class="md-sym">]($2)</span>');
+        function showToast(message) {
+            toast.innerText = message;
+            toast.classList.remove('opacity-0', 'pointer-events-none');
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'pointer-events-none');
+            }, 3000);
+        }
 
-      // Bear-style #tag (word boundary, not inside code)
-      s = s.replace(/(^|\s)(#[a-z0-9_\-áéíóúãõç]+)/gi,
-        '$1<span class="md-tag">$2</span>');
+        function escapeHTML(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
 
-      return s;
-    }
+        // Search listener
+        searchBox.addEventListener('input', (e) => {
+            renderNotes(e.target.value);
+        });
 
-    function buildHighlight(text) {
-      return text.split('\n').map(highlightLine).join('\n');
-    }
+        // Close modal on click outside
+        noteModal.addEventListener('click', (e) => {
+            if (e.target === noteModal) closeModal();
+        });
 
-    /* ── DOM refs ────────────────────────────────────────────────── */
-    const ta      = document.getElementById('editor-ta');
-    const hl      = document.getElementById('editor-highlight');
-    const scroll  = document.getElementById('editor-scroll');
-    const titleEl = document.getElementById('note-title');
-    const tagsRow = document.getElementById('etags');
-    const tagIn   = document.getElementById('tag-input');
-    const noteWrap= document.getElementById('note-wrap');
-    const emptyEl = document.getElementById('empty-state');
-
-    /* ── Sync textarea height & highlight ───────────────────────── */
-    function syncHighlight() {
-      hl.innerHTML = buildHighlight(ta.value);
-      // Keep textarea height >= highlight div so scroll works on parent
-      ta.style.height = 'auto';
-      ta.style.height = Math.max(ta.scrollHeight, scroll.clientHeight) + 'px';
-    }
-
-    /* ── Open note ───────────────────────────────────────────────── */
-    function openNote(id) {
-      activeId = id;
-      const n = getNote(id);
-      if (!n) return;
-      emptyEl.style.display = 'none';
-      noteWrap.style.display = 'flex';
-      noteWrap.style.flex = '1';
-      noteWrap.style.flexDirection = 'column';
-      noteWrap.style.overflow = 'hidden';
-      titleEl.value = n.title || '';
-      ta.value = n.content || '';
-      syncHighlight();
-      renderTags(n.tags || []);
-      renderSidebar();
-      ta.focus();
-    }
-
-    /* ── Save ────────────────────────────────────────────────────── */
-    function scheduleSave() {
-      clearTimeout(saveTimer);
-      saveTimer = setTimeout(forceSave, 600);
-    }
-    function forceSave() {
-      if (!activeId) return;
-      const n = getNote(activeId);
-      if (!n) return;
-      n.title   = titleEl.value;
-      n.content = ta.value;
-      n.updated = Date.now();
-      persist();
-      renderSidebar();
-    }
-
-    /* ── Textarea events ─────────────────────────────────────────── */
-    ta.addEventListener('input', () => { syncHighlight(); scheduleSave(); });
-    ta.addEventListener('scroll', () => { hl.style.transform = `translateY(-${ta.scrollTop}px)`; });
-    titleEl.addEventListener('input', scheduleSave);
-
-    // Sync scroll of hl to match textarea scroll
-    scroll.addEventListener('scroll', () => {
-      hl.style.top = (-scroll.scrollTop) + 'px';
-    });
-
-    // Keyboard shortcuts
-    ta.addEventListener('keydown', e => {
-      const ctrl = e.ctrlKey || e.metaKey;
-      if (ctrl && e.key === 'b') { e.preventDefault(); wrap('**', '**'); }
-      if (ctrl && e.key === 'i') { e.preventDefault(); wrap('*',  '*' ); }
-      if (ctrl && e.key === 's') { e.preventDefault(); forceSave();      }
-      if (e.key === 'Tab') {
-        e.preventDefault();
-        insertAt('  ');
-      }
-    });
-
-    /* ── Inline helpers ──────────────────────────────────────────── */
-    function wrap(before, after) {
-      const s = ta.selectionStart, e = ta.selectionEnd;
-      const sel = ta.value.slice(s, e) || 'texto';
-      const rep = before + sel + after;
-      ta.setRangeText(rep, s, e, 'select');
-      // Position cursor inside the markers
-      ta.selectionStart = s + before.length;
-      ta.selectionEnd   = s + before.length + sel.length;
-      ta.focus();
-      syncHighlight(); scheduleSave();
-    }
-
-    function insertAt(text, collapse = true) {
-      const s = ta.selectionStart;
-      ta.setRangeText(text, s, ta.selectionEnd, 'end');
-      if (collapse) { ta.selectionStart = ta.selectionEnd = s + text.length; }
-      ta.focus();
-      syncHighlight(); scheduleSave();
-    }
-
-    function insertLinePrefix(prefix) {
-      const s = ta.selectionStart;
-      const lineStart = ta.value.lastIndexOf('\n', s - 1) + 1;
-      ta.setRangeText(prefix, lineStart, lineStart, 'end');
-      ta.selectionStart = ta.selectionEnd = lineStart + prefix.length;
-      ta.focus();
-      syncHighlight(); scheduleSave();
-    }
-
-    /* ── Toolbar ─────────────────────────────────────────────────── */
-    document.querySelectorAll('.tb-btn[data-cmd]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const cmd = btn.dataset.cmd;
-        ta.focus();
-        if      (cmd === 'bold')   wrap('**', '**');
-        else if (cmd === 'italic') wrap('*',  '*' );
-        else if (cmd === 'strike') wrap('~~', '~~');
-        else if (cmd === 'code')   wrap('`',  '`' );
-        else if (cmd === 'ul')    insertLinePrefix('- ');
-        else if (cmd === 'ol')    insertLinePrefix('1. ');
-        else if (cmd === 'quote') insertLinePrefix('> ');
-        else if (cmd === 'hr')    insertAt('\n---\n');
-        else if (cmd === 'table') insertAt('\n| Col 1 | Col 2 | Col 3 |\n|-------|-------|-------|\n| dado  | dado  | dado  |\n');
-      });
-    });
-
-    document.getElementById('heading-sel').addEventListener('change', function () {
-      if (!this.value) return;
-      insertLinePrefix(this.value);
-      this.value = '';
-    });
-
-    document.getElementById('btn-color').addEventListener('click', () => {
-      const c = document.getElementById('color-picker').value;
-      const s = ta.selectionStart, e = ta.selectionEnd;
-      const sel = ta.value.slice(s, e) || 'texto';
-      insertAt(`<span style="color:${c}">${sel}</span>`, false);
-    });
-
-    document.getElementById('hl-select').addEventListener('change', function () {
-      if (!this.value) return;
-      const s = ta.selectionStart, e = ta.selectionEnd;
-      const sel = ta.value.slice(s, e) || 'texto';
-      insertAt(`==${this.value}:${sel}==`, false);
-      this.value = '';
-    });
-
-    /* ── Tags ────────────────────────────────────────────────────── */
-    function renderTags(tags) {
-      tagsRow.innerHTML = tags.map(t =>
-        `<span class="etag">#${t}<span class="etag-rm" data-tag="${t}">×</span></span>`
-      ).join('');
-      tagsRow.querySelectorAll('.etag-rm').forEach(el => el.addEventListener('click', () => {
-        const n = getNote(activeId); if (!n) return;
-        n.tags = n.tags.filter(x => x !== el.dataset.tag);
-        persist(); renderTags(n.tags); renderSidebar();
-      }));
-    }
-
-    tagIn.addEventListener('keydown', e => {
-      if (['Enter', ',', ' '].includes(e.key)) {
-        e.preventDefault();
-        const val = tagIn.value.trim().toLowerCase().replace(/[^a-z0-9\-_áéíóúãõç]/gi, '');
-        if (!val) return;
-        const n = getNote(activeId); if (!n) return;
-        if (!n.tags.includes(val)) { n.tags.push(val); persist(); renderTags(n.tags); renderSidebar(); }
-        tagIn.value = '';
-      }
-      if (e.key === 'Backspace' && !tagIn.value) {
-        const n = getNote(activeId); if (!n || !n.tags.length) return;
-        n.tags.pop(); persist(); renderTags(n.tags); renderSidebar();
-      }
-    });
-
-    /* ── Sidebar ─────────────────────────────────────────────────── */
-    function allTags() {
-      const s = new Set();
-      notes.forEach(n => (n.tags || []).forEach(t => s.add(t)));
-      return [...s].sort();
-    }
-
-    function filteredNotes() {
-      let r = [...notes];
-      if (filterTags.length) r = r.filter(n => filterTags.every(t => (n.tags || []).includes(t)));
-      if (searchQ) {
-        const q = searchQ.toLowerCase();
-        r = r.filter(n =>
-          (n.title || '').toLowerCase().includes(q) ||
-          (n.content || '').toLowerCase().includes(q) ||
-          (n.tags || []).some(t => t.toLowerCase().includes(q))
-        );
-      }
-      return r.sort((a, b) => b.updated - a.updated);
-    }
-
-    function hlText(t) {
-      if (!searchQ) return escHtml(t);
-      const re = new RegExp('(' + searchQ.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
-      return escHtml(t).replace(re, '<mark class="sh">$1</mark>');
-    }
-
-    function renderSidebar() {
-      const tags = allTags();
-      const tb = document.getElementById('tags-bar');
-      tb.innerHTML = tags.length
-        ? tags.map(t => `<span class="tag-pill${filterTags.includes(t) ? ' active' : ''}" data-tag="${t}">#${t}</span>`).join('')
-        : '<span style="font-size:11px;color:var(--text-muted)">Sem tags ainda</span>';
-      tb.querySelectorAll('.tag-pill').forEach(el => el.addEventListener('click', () => {
-        const t = el.dataset.tag;
-        filterTags = filterTags.includes(t) ? filterTags.filter(x => x !== t) : [...filterTags, t];
-        renderSidebar();
-      }));
-
-      const fn = filteredNotes();
-      const nl = document.getElementById('notes-list');
-      if (!fn.length) {
-        nl.innerHTML = '<div style="padding:20px 14px;font-size:12px;color:var(--text-muted)">Nenhuma nota encontrada</div>';
-        return;
-      }
-      nl.innerHTML = fn.map(n => {
-        const preview = (n.content || '').replace(/[#*`_>~=\[\]|]/g, '').slice(0, 80);
-        const date = new Date(n.updated).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
-        return `<div class="note-item${n.id === activeId ? ' active' : ''}" data-id="${n.id}">
-          <div class="ni-title">${hlText(n.title || 'Sem título')}</div>
-          <div class="ni-preview">${hlText(preview)}</div>
-          ${(n.tags || []).length ? `<div class="ni-tags">${n.tags.map(t => `<span class="ni-tag">#${t}</span>`).join('')}</div>` : ''}
-          <div class="ni-date">${date}</div>
-        </div>`;
-      }).join('');
-      nl.querySelectorAll('.note-item').forEach(el =>
-        el.addEventListener('click', () => { forceSave(); openNote(+el.dataset.id); })
-      );
-    }
-
-    /* ── Controls ────────────────────────────────────────────────── */
-    document.getElementById('btn-new').addEventListener('click', () => {
-      forceSave();
-      const n = { id: genId(), title: 'Nova nota', content: '', tags: [], created: Date.now(), updated: Date.now() };
-      notes.unshift(n); persist(); openNote(n.id);
-    });
-
-    document.getElementById('btn-del').addEventListener('click', () => {
-      if (!activeId || !confirm('Excluir esta nota?')) return;
-      notes = notes.filter(n => n.id !== activeId);
-      persist(); activeId = null;
-      noteWrap.style.display = 'none';
-      emptyEl.style.display = 'flex';
-      renderSidebar();
-    });
-
-    document.getElementById('btn-toggle-sb').addEventListener('click', () =>
-      document.getElementById('sidebar').classList.toggle('collapsed')
-    );
-
-    document.getElementById('btn-theme').addEventListener('click', () => {
-      document.body.dataset.theme = document.body.dataset.theme === 'dark' ? 'light' : 'dark';
-    });
-
-    document.getElementById('search').addEventListener('input', function () {
-      searchQ = this.value.trim(); renderSidebar();
-    });
-
-    /* ── Images ──────────────────────────────────────────────────── */
-    document.getElementById('btn-img').addEventListener('click', () =>
-      document.getElementById('img-panel').classList.toggle('open')
-    );
-    document.getElementById('btn-img-close').addEventListener('click', () =>
-      document.getElementById('img-panel').classList.remove('open')
-    );
-    document.getElementById('img-file').addEventListener('change', function () {
-      [...this.files].forEach(insertImage); this.value = '';
-    });
-
-    function insertImage(file) {
-      const r = new FileReader();
-      r.onload = e => {
-        insertAt(`\n![${escHtml(file.name)}](${e.target.result})\n`);
-      };
-      r.readAsDataURL(file);
-    }
-
-    ta.addEventListener('paste', e => {
-      const img = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith('image/'));
-      if (img) { e.preventDefault(); insertImage(img.getAsFile()); }
-    });
-
-    /* ── Init ────────────────────────────────────────────────────── */
-    renderSidebar();
-    if (notes.length) openNote(notes[0].id);
-
-    // Keep highlight in sync on window resize
-    window.addEventListener('resize', syncHighlight);
-  })();
-  </script>
+    </script>
 </body>
 </html>
